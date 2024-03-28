@@ -1,0 +1,6 @@
+*.asm
+*.txt
+tmp/
+__pycache__/
+*.exe*
+*.exe
