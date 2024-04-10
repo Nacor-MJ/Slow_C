@@ -1,23 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "ir.c"
+#ifndef PARSER_C
+#define PARSER_C
 
-#include "tokens.c"
-
-typedef enum {
-    OP_INVALID,
-    OP_PLUS,
-    OP_MINUS,
-    OP_TIMES,
-    OP_DIV,
-    OP_EQ,
-    OP_NE,
-    OP_MT,
-    OP_LT,
-    OP_ME,
-    OP_LE
-} Binop;
+#include "slow_c.h"
 
 const char* op_enum_to_char(Binop bp) {
     switch (bp) {
@@ -47,55 +31,60 @@ const char* op_enum_to_char(Binop bp) {
             return "Unknown";
     }
 } 
-typedef enum {
-    VAL,
-    BIN_EXPR
-} NodeVar;
 
-typedef struct Node Node;
-
-typedef struct {
-    Node* l;
-    Binop op;
-    Node* r;
-} BinExpr;
-
-
-typedef union {
-    int val;
-    BinExpr* bin_expr;
-} NodeVal;
-
-typedef struct Node {
-    NodeVar var;
-    NodeVal val;
-} Node;
-
-void print_indent(int level) {
+void print_indent(int level, const char* end = "") {
+    if (level < 0) return;
     for (int i = 0; i < level; ++i) {
         printf("  ");  // Assuming 2 spaces per indentation level
     }
+    printf("%s", end);
 }
 
-void print_node(Node *node, int indent = 0) {
+void print_node(Node *node, int indent) {
     if (node == NULL) {
+        // printf("NULL Node\n");
         return;
     }
     
-    print_indent(indent);
+    NodeVar var = node->var;
     
-    if (node->var == VAL) {
-        printf("Value: %d\n", node->val.val);
-    } else if (node->var == BIN_EXPR) {
-        printf("Binary Expression:\n");
-        print_indent(indent + 1);
-        printf("Left:\n");
-        print_node(node->val.bin_expr->l, indent + 2);
-        print_indent(indent + 1);
-        printf("Operator: %s\n", op_enum_to_char(node->val.bin_expr->op));
-        print_indent(indent + 1);
-        printf("Right:\n");
-        print_node(node->val.bin_expr->r, indent + 2);
+    if (var == VAL) {
+        printf("#%d\n", node->val.val);
+    } else if (var == BIN_EXPR) {
+        printf("{\n");
+        print_indent(indent);
+        print_node(node->val.bin_expr->l, indent + 1);
+        print_indent(indent);
+        printf("%s\n", op_enum_to_char(node->val.bin_expr->op));
+        print_indent(indent);
+        print_node(node->val.bin_expr->r, indent + 1);
+        print_indent(indent - 1);
+        printf("}\n");
+    } else if (var == BLOCK) {
+        printf("Program:\n");
+        print_indent(indent);
+        NodeList ndlist = node->val.block;
+        int i; Node* nd;
+        vec_foreach(&ndlist, nd, i) {
+            print_indent(indent + 1);
+            print_node(nd, indent + 1);
+        }
+    } else if (var == VARIABLE_ASSIGNMENT) {
+        VariableAssignment* va = node->val.variable_assignment;
+        printf("%d%s = ", va->type, va->name);
+        print_node(va->val, indent + 1);
+    } else if (var == FUNCTION_CALL) {
+        FunctionCall fc = node->val.function_call;
+        printf("Function Call: %s\n", fc.name);
+        NodeList ndlist = fc.args;
+        int i; Node* nd;
+        vec_foreach(&ndlist, nd, i) {
+            print_node(nd, indent + 1);
+        }
+    } else if (var == VARIABLE_IDENT) {
+        printf("$%s\n", node->val.variable_ident);
+    } else {
+        printf("print_node not implemented for node type: %d\n", node->var);
     }
 }
 
@@ -118,7 +107,8 @@ void assign_r_to_BinExpr(BinExpr* be, Node nd){
 }
 
 void free_node_children(Node* nd){
-    if (nd->var == BIN_EXPR){
+    NodeVar var = nd->var;
+    if (var == BIN_EXPR) {
         BinExpr* be = nd->val.bin_expr;
         if (be->l != NULL) {
             free_node_children(be->l);
@@ -127,10 +117,21 @@ void free_node_children(Node* nd){
             free_node_children(be->r);
         }
         free(be); // This is good <3
-    } else if(nd->var == VAL){
-
+    } else if (var == BLOCK) {
+        NodeList list = nd->val.block; 
+        int i; Node* nd;
+        vec_foreach(&list, nd, i) {
+            free_node_children(nd);
+        }
+        free(list.data);
+    } else if (var == VARIABLE_ASSIGNMENT) {
+        VariableAssignment* va = nd->val.variable_assignment;
+        free(va->name); // this is char*
+        free_node_children(va->val);
+    } else if (var == VAL || var == VARIABLE_IDENT) {
+        // pas
     } else {
-        printf("Not all node types are freed");
+        printf("Not all node types are freed, node type: %d\n", var);
         exit(-1);
     }
 }
@@ -164,77 +165,40 @@ InstructionType binop_to_instructiontype(Binop op){
     }
 }
 
-// void node_to_ir(Node* nd, char* dst, Reg target_reg){
-// returns the last Instruction
-void node_to_ir(Node* nd, Instruction* parent, Reg target_reg){
-    NodeVar variant = nd->var;
+void add_variable(Parser* p, Token var, Type type){
+    int idx;
+    vec_find(&p->variables.names, var.data.ident, idx);
+    if (idx != -1) {
+        printf("Variable '%s' already exists\n", var.data.ident);
+        print_error_tok(&var, p->absolute_start);
+        exit(-1);
+    }
 
-    Instruction* instr = empty_instruction();
-
-    if (variant == VAL) {
-        instr->type = MOV;
-        instr->args = REG_CONST;
-        instr->first_arg.reg = target_reg;
-        instr->second_arg.constant = nd->val.val;
-        append_instruction(parent, instr);
-        return;
-    } else if (variant == BIN_EXPR){
-        BinExpr* be = nd->val.bin_expr;
-
-        node_to_ir(be->l, instr, target_reg);
-        append_instruction(parent, instr);
-
-        Instruction* r_instr = empty_instruction();
-        node_to_ir(be->r, r_instr, increase_reg(target_reg));
-        append_instruction(parent, r_instr);
-
-        instr = empty_instruction();
-
-        instr->type = binop_to_instructiontype(be->op);
-
-        // TODO handle weird registers with
-        // div and times
-        InstructionVal val;
-        switch (be->op){
-            case OP_DIV:
-            case OP_TIMES:
-                instr->args = REG;
-
-                val.reg = target_reg;
-                instr->first_arg = val;
-                break;
-            case OP_PLUS:
-            case OP_MINUS:
-            case OP_EQ:
-            case OP_NE:
-            case OP_MT:
-            case OP_LT:
-            case OP_ME:
-            case OP_LE:
-                instr->args = REG_REG;
-
-                val.reg = target_reg;
-                instr->first_arg = val;
-
-                val.reg = increase_reg(target_reg);
-                instr->second_arg = val;
-                break;
-            default:
-                printf("Invalid Binop\n");
-                exit(-1);
-        }
-        append_instruction(parent, instr);
+    vec_push(&p->variables.names, var.data.ident);
+    vec_push(&p->variables.types, type);
+}
+Type get_var_type(Parser* p, Token var){
+    int idx;
+    vec_find_custom_comp_func(&p->variables.names, var.data.ident, idx, strcmp);
+    if (idx == -1) {
+        printf("Variable '%s' doesn't exist\n", var.data.ident);
+        print_error_tok(&var, p->absolute_start);
+        exit(-1);
+    }
+    return p->variables.types.data[idx];
+}
+void print_vars(Parser* p) {
+    int i; char* name;
+    vec_foreach(&p->variables.names, name, i) {
+        printf("%d $%s\n", p->variables.types.data[i], name);
     }
 }
 
-Node parse_expr(Token** tk);
-Node parse_eq_ne(Token** tk);
-Node parse_comp_expr(Token** tk);
-Node parse_bin_expr(Token** tk);
-Node parse_term(Token** tk);
-Node parse_factor(Token** tk);
+void append_node(NodeList* list, Node* nd) {
+    vec_push(list, nd);
+}
 
-Node parse_factor(Token** tk){
+Node parse_factor(Parser* p, Token** tk){
     Token next = next_token(tk);
 
     if (next.type == TK_MINUS){
@@ -248,16 +212,29 @@ Node parse_factor(Token** tk){
 
     if (next.type == TK_NUM){
         eat_token(tk, TK_NUM);
+        NodeVal nv;
+        nv.val = next.data.num;
         Node nd = {
             VAL,
-            {next.data.num}
+            nv
         };
         return nd;
     } else if (next.type == TK_LPAREN){
         eat_token(tk, TK_LPAREN);
-        Node result = parse_expr(tk);
+        Node result = parse_expr(p, tk);
         eat_token(tk, TK_RPAREN);
         return result;
+    } else if (next.type == TK_IDENT) {
+        eat_token(tk, TK_IDENT);
+        
+        NodeVal ndata;
+        ndata.variable_ident = next.data.ident;
+        Node nd = {
+            VARIABLE_IDENT,
+            ndata
+        };
+        return nd;
+
     } else {
         printf("Expected factor, got: ");
         print_token(&next);
@@ -265,8 +242,8 @@ Node parse_factor(Token** tk){
     }
 }
 
-Node parse_term(Token** tk){
-    Node factor = parse_factor(tk);
+Node parse_term(Parser* p, Token** tk){
+    Node factor = parse_factor(p, tk);
 
     if (next_token(tk).type == TK_TIMES || next_token(tk).type == TK_DIV){
         BinExpr result = {
@@ -291,7 +268,7 @@ Node parse_term(Token** tk){
         }
 
         consume_token(tk);
-        assign_r_to_BinExpr(&result, parse_factor(tk));
+        assign_r_to_BinExpr(&result, parse_factor(p, tk));
 
         NodeVal nv;
         nv.bin_expr = (BinExpr*) malloc(sizeof(BinExpr));
@@ -309,8 +286,8 @@ Node parse_term(Token** tk){
 
 }
 
-Node parse_bin_expr(Token** tk){
-    Node term = parse_term(tk);
+Node parse_bin_expr(Parser* p, Token** tk){
+    Node term = parse_term(p, tk);
 
     if (next_token(tk).type == TK_PLUS || next_token(tk).type == TK_MINUS){
         
@@ -326,11 +303,11 @@ Node parse_bin_expr(Token** tk){
         switch (op.type){
             case (TK_MINUS):
                 result.op = OP_MINUS;
-                assign_r_to_BinExpr(&result, parse_term(tk));
+                assign_r_to_BinExpr(&result, parse_term(p, tk));
                 break;
             case (TK_PLUS):
                 result.op = OP_PLUS;
-                assign_r_to_BinExpr(&result, parse_term(tk));
+                assign_r_to_BinExpr(&result, parse_term(p, tk));
                 break;
             default:
                 printf("Expected Plus or Minus");
@@ -353,8 +330,8 @@ Node parse_bin_expr(Token** tk){
 
 
 // <, >, <=, >=
-Node parse_relational_expr(Token** tk){
-    Node bin_expr = parse_bin_expr(tk);
+Node parse_relational_expr(Parser* p, Token** tk){
+    Node bin_expr = parse_bin_expr(p, tk);
 
     if (
         next_token(tk).type == TK_MT ||
@@ -390,7 +367,7 @@ Node parse_relational_expr(Token** tk){
                 exit(-1);
         }
         
-        assign_r_to_BinExpr(&result, parse_term(tk));
+        assign_r_to_BinExpr(&result, parse_term(p, tk));
         
         NodeVal nv;
         nv.bin_expr = (BinExpr*) malloc(sizeof(BinExpr));
@@ -408,8 +385,8 @@ Node parse_relational_expr(Token** tk){
 }
 
 // == !=
-Node parse_eq_ne(Token** tk){
-    Node bin_expr = parse_relational_expr(tk);
+Node parse_eq_ne(Parser* p, Token** tk){
+    Node bin_expr = parse_relational_expr(p, tk);
 
     if (
         next_token(tk).type == TK_EQ ||
@@ -437,7 +414,7 @@ Node parse_eq_ne(Token** tk){
                 exit(-1);
         }
         
-        assign_r_to_BinExpr(&result, parse_term(tk));
+        assign_r_to_BinExpr(&result, parse_term(p, tk));
         
         NodeVal nv;
         nv.bin_expr = (BinExpr*) malloc(sizeof(BinExpr));
@@ -454,30 +431,183 @@ Node parse_eq_ne(Token** tk){
     }
 }
 
-Node parse_expr(Token** tk){
-    return parse_eq_ne(tk);
+Node parse_expr(Parser* p, Token** tk){
+    return parse_eq_ne(p, tk);
 }
 
-Node parse_from_tok(Token* tk){
-    return parse_expr(&tk);
-}
-
-Node parse(char* src){
-    Token *tokens = (Token*) malloc(sizeof(Token) * 20);
-    if (tokens == NULL) {
-        printf("Could not allocate memory for tokens");
-        exit(1);
+void parse_arg_list(Parser*p, Token** tk, NodeList* list) {
+    while (next_token(tk).type != TK_RPAREN) {
+        Node* nd = (Node*) malloc(sizeof(Node));
+        if (nd == NULL) exit(69);
+        *nd = parse_expr(p, tk);
+        if (next_token(tk).type != TK_RPAREN) eat_token(tk, TK_COMMA);
+        append_node(list, nd);
     }
+}
 
-    tokenize(tokens, src);
+Node parse_statement(Parser* p, Token** tk) {
+    // Variable definiton
+    if (next_token(tk).type == TK_TYPE_KEYWORD) {
+        Token type_tk = eat_token(tk, TK_TYPE_KEYWORD);
+        Token name = consume_token(tk);
+        eat_token(tk, TK_ASSIGN);
 
-    printTokens(tokens);
+        Node expr = parse_expr(p, tk);
+
+        eat_token(tk, TK_SEMICOLON);
+
+        NodeVal nv;
+        nv.variable_assignment = (VariableAssignment*) malloc(sizeof(VariableAssignment));
+        if (nv.variable_assignment == NULL) exit(69);
+        nv.variable_assignment->name = name.data.ident;
+        nv.variable_assignment->val = (Node*) malloc(sizeof(Node));
+        *(nv.variable_assignment->val) = expr;
+        nv.variable_assignment->type = type_tk.data.type;
+
+        add_variable(p, name, type_tk.data.type);
+
+        Node nd = {
+            VARIABLE_ASSIGNMENT,
+            nv
+        };
+
+        return nd;
+    // Variable redeclaration
+    } else if (next_token(tk).type == TK_IDENT) {
+        Token var = eat_token(tk, TK_IDENT);
+        if (next_token(tk).type == TK_ASSIGN) {
+            eat_token(tk, TK_ASSIGN);
+            Node expr = parse_expr(p, tk);
+
+            eat_token(tk, TK_SEMICOLON);
+
+            NodeVal nv;
+            nv.variable_assignment = (VariableAssignment*) malloc(sizeof(VariableAssignment));
+            if (nv.variable_assignment == NULL) exit(69);
+            nv.variable_assignment->name = var.data.ident;
+            nv.variable_assignment->val = (Node*) malloc(sizeof(Node));
+            *(nv.variable_assignment->val) = expr;
+            nv.variable_assignment->type = get_var_type(p, var);
+
+            Node nd = {
+                VARIABLE_ASSIGNMENT,
+                nv
+            };
+
+            return nd;
+        } else {
+            NodeVal nv;
+
+            vec_init(&nv.function_call.args);
+
+            eat_token(tk, TK_LPAREN);
+            
+            parse_arg_list(p, tk, &nv.function_call.args);
+
+            eat_token(tk, TK_RPAREN);
+
+            Node nd = {
+                FUNCTION_CALL,
+                nv
+            };
+
+            eat_token(tk, TK_SEMICOLON);
+
+            return nd;
+        }
+    } else {
+        printf("Expected statement\n");
+        exit(-1);
+    }
+}
+
+Node* parse_next_statement(Parser* p, Token** tk) {
+    Node* result = NULL;
+    Token next = next_token(tk);
+    if (next.type == TK_TYPE_KEYWORD || next.type == TK_IDENT) {
+        result = (Node*) malloc(sizeof(Node));
+        if (result == NULL) exit(69);
+
+        *result = parse_statement(p, tk);
+    }
+    return result;
+}
+
+Node parse_function(Parser* p, Token** tk) {
+    Type return_type = eat_token(tk, TK_TYPE_KEYWORD).data.type;
+    char* fn_name = eat_token(tk, TK_IDENT).data.ident;
+    eat_token(tk, TK_LPAREN);
     
-    Node result = parse_from_tok(tokens);
+    NodeList args;
+    vec_init(&args);
 
+    parse_arg_list(p, tk, &args);
+
+    eat_token(tk, TK_RPAREN);
+    eat_token(tk, TK_LCURLY);
+
+    Node body = parse_program(p, tk);
+
+    eat_token(tk, TK_RCURLY);
+
+    NodeVal fn_val;
+    FunctionCall fc = {
+        return_type,
+        fn_name,
+        args
+    };
+    FunctionDefinition fd = {
+        fc,
+        body.val.block
+    };
+    fn_val.function_definition = fd;
+    Node fn = {
+        FUNCTION_DEFINITION,
+        fn_val
+    };
+    return fn;
+}
+Node parse_program(Parser* p, Token** tk) {
+    NodeList list;
+    vec_init(&list);
+
+    NodeVal nv;
+    nv.block = list;
+
+    Node* next = parse_next_statement(p, tk);
+    while (next != NULL) {
+        append_node(&nv.block, next);
+        next = parse_next_statement(p, tk);
+    }
+    Node result = {
+        BLOCK,
+        nv
+    };
+    return result;
+}
+
+Node parse_from_tok(Parser* p, Token* tk){
+    Node program = parse_program(p, &tk);
+
+    return program;
+}
+
+Node parse(Token* src){
+    Parser p;
+    vec_init(&p.variables.names);
+    vec_init(&p.variables.types);
+
+    p.absolute_start = src->start_of_token;
+
+    Node result = parse_from_tok(&p, src);
+
+    vec_deinit(&p.variables.types);
+    vec_deinit(&p.variables.names);
+
+    printf("\033[94mParsed Node:\033[0m\n");
     print_node(&result);
-
-    free(tokens);
 
     return result;
 }
+
+#endif

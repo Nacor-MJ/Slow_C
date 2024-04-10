@@ -1,34 +1,7 @@
-#include <math.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <stdlib.h>
+#ifndef TOKENS_C
+#define TOKENS_C
 
-typedef enum {
-    TK_EOF = 0,
-    TK_PLUS,
-    TK_MINUS,
-    TK_TIMES,
-    TK_DIV,
-    TK_NUM,
-    TK_IDENT,
-    TK_LPAREN,
-    TK_RPAREN,
-    TK_EQ, // ==
-    TK_NE, // !=
-    TK_MT, // >
-    TK_LT, // <
-    TK_ME, // >=
-    TK_LE, // <=
-    TK_INVALID
-} TokenType;
-typedef union {
-    int num;
-    char* ident;
-} TokenData;
-typedef struct {
-    TokenType type;
-    TokenData data;
-} Token;
+#include "slow_c.h"
 
 Token consume_token(Token** tk){
     Token a = **tk;
@@ -36,12 +9,18 @@ Token consume_token(Token** tk){
     return a;
 }
 
-void eat_token(Token** tk, TokenType check){
+Token eat_token(Token** tk, TokenType check){
     Token next = consume_token(tk);
     if (next.type != check){
-        printf("Invalid Token, expected: %d , got %d", check, next.type);
+        printf("\033[91mInvalid Token, expected: \n\t");
+        Token check_tk = {check, {0}, NULL};
+        print_token(&check_tk);
+        printf("got: \n\t");
+        print_token(&next);
+        printf("\033[0m");
         exit(-1);
     }
+    return next;
 }
 
 Token next_token(Token** tk) {
@@ -83,7 +62,7 @@ void print_token(Token* t){
             break;
         case TK_IDENT:
             printf("Token: identifier");
-            printf(" %s\n", t->data.ident);
+            printf(" '%s'\n", t->data.ident);
             break;
         case TK_NE:
             printf("Token: not equal\n");
@@ -103,6 +82,18 @@ void print_token(Token* t){
         case TK_EQ:
             printf("Token: equal\n");
             break;
+        case TK_SEMICOLON:
+            printf("Token: semicolon\n");
+            break;
+        case TK_TYPE_KEYWORD:
+            printf("Token: Type Keywoard %d\n", t->data.type);
+            break;
+        case TK_ASSIGN:
+            printf("Token: assign\n");
+            break;
+        case TK_COMMA:
+            printf("Token: comma\n");
+            break;
         default:
             printf("Unknown token type\n");
             break;
@@ -116,52 +107,83 @@ void printTokens(Token* t) {
     }
 }
 
-Token tokenize_num(char** src){
+void tokenize_num(Token* tk, char** src){
     int num = strtol(*src, src, 0);
-
-    Token tk = {
-        TK_NUM,
-        {num},
-    };
-    return tk;
+    
+    tk->type = TK_NUM;
+    tk->data.num = num;
 }
 void add_token(Token** tks, Token tk) {
     **tks = tk;
     (*tks)++;
 }
 
-Token tokenize_comp_operator(char** src){
-    Token tk = {
-        TK_INVALID,
-        {0}
-    };
+// Compares two tokens and their data
+bool compare_tokens(Token a, Token b) {
+    if (a.type == b.type){
+        switch (a.type){
+            case TK_NUM:
+                return a.data.num == b.data.num;
+            case TK_IDENT:
+                return strcmp(a.data.ident, b.data.ident) == 0;
+            default:
+                return true;
+        }
+    } 
+    return false;
+}
+
+void tokenize_comp_operator(Token* tk, char** src){
     if (strncmp(*src, "==", 2) == 0){
-        tk.type = TK_EQ;
+        tk->type = TK_EQ;
     } else if (strncmp(*src, "!=", 2) == 0){
-        tk.type = TK_NE;
+        tk->type = TK_NE;
     } else if (strncmp(*src, "<=", 2) == 0){
-        tk.type = TK_LE;
+        tk->type = TK_LE;
     } else if (strncmp(*src, ">=", 2) == 0){
-        tk.type = TK_ME;
+        tk->type = TK_ME;
     } else if ('<' == **src){
         *src -=1;
-        tk.type = TK_LT;
+        tk->type = TK_LT;
     } else if ('>' == **src){
         *src -=1;
-        tk.type = TK_MT;
+        tk->type = TK_MT;
+    } else if ('=' == **src) {
+        *src -=1;
+        tk->type = TK_ASSIGN;
     } else {
         printf("Not a Valid Comp Operator: %c", **src);
         exit(-1);
     }
     (*src) += 2;
-    return tk;
 }
+
+// Prints The Error message and the line above and below the token
+void print_error_tok(Token* tk, char* absolute_start) {
+    printf("Token: ");
+    print_token(tk);
+    printf("\n");
+    
+    int line_num = 1;
+    while (absolute_start != tk->start_of_token){
+        if (*absolute_start == '\n'){
+            line_num++;
+        }
+        absolute_start++;
+    }
+    printf("Line num: %d\n", line_num);
+}
+
 void tokenize(Token* tk, char* src) {
-        skip_whitespace(&src);
+    char* absolute_start = src;
+    char* start = src;
+    skip_whitespace(&src);
     while (*src){
+        start = src;
         Token tmp = {
-            TK_PLUS,
-            {0}
+            TK_EOF,
+            {0},
+            start,
         };
         switch (*src) {
             case '-':
@@ -188,21 +210,53 @@ void tokenize(Token* tk, char* src) {
                 src++;
                 tmp.type = TK_RPAREN;
                 break;
+            case ';':
+                src++;
+                tmp.type = TK_SEMICOLON;
+                break;
+            case ',':
+                src++;
+                tmp.type = TK_COMMA;
+                break;
             case '=':
             case '!':
             case '<':
             case '>':
-                tmp = tokenize_comp_operator(&src);
+                tokenize_comp_operator(&tmp, &src);
                 break;
             default:
                 if (isdigit((int) *src)){
-                    tmp = tokenize_num(&src);
+                    tokenize_num(&tmp, &src);
+                } else if (strncmp(src, "int", 3) == 0) {
+                    src += 3;
+                    tmp.type = TK_TYPE_KEYWORD;
+                    tmp.data.type = INT;
                 } else {
-                    printf("Invalid character: %c\n", *src);
-                    exit(-1);
+                    char* buff;
+                    int i = 0;
+                    if (isalpha((int) *src) == 0 || *src == '_'){
+                        printf(
+                            "Not a valid identifier: '%c', hex: '%x' \n", 
+                            *src, 
+                            *src && 0xff
+                        );
+                        print_error_tok(&tmp, absolute_start);
+                        exit(-1);
+                    }
+                    while (isalpha((int) *src)){
+                        i++;
+                        src++;
+                    }
+                    buff = (char*) malloc(i + 1);
+                    strncpy(buff, (src - i), i);
+                    buff[i] = '\0';
+                    tmp.type = TK_IDENT;
+                    tmp.data.ident = buff;
                 }
         }
         add_token(&tk, tmp);
         skip_whitespace(&src);
     }
 }
+
+#endif
