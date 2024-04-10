@@ -32,7 +32,7 @@ const char* op_enum_to_char(Binop bp) {
     }
 } 
 
-void print_indent(int level, const char* end = "") {
+void print_indent(int level, const char* end) {
     if (level < 0) return;
     for (int i = 0; i < level; ++i) {
         printf("  ");  // Assuming 2 spaces per indentation level
@@ -52,21 +52,21 @@ void print_node(Node *node, int indent) {
         printf("#%d\n", node->val.val);
     } else if (var == BIN_EXPR) {
         printf("{\n");
-        print_indent(indent);
+        print_indent(indent, "");
         print_node(node->val.bin_expr->l, indent + 1);
-        print_indent(indent);
+        print_indent(indent, "");
         printf("%s\n", op_enum_to_char(node->val.bin_expr->op));
-        print_indent(indent);
+        print_indent(indent, "");
         print_node(node->val.bin_expr->r, indent + 1);
-        print_indent(indent - 1);
+        print_indent(indent - 1, "");
         printf("}\n");
     } else if (var == BLOCK) {
         printf("Program:\n");
-        print_indent(indent);
+        print_indent(indent, "");
         NodeList ndlist = node->val.block;
         int i; Node* nd;
         vec_foreach(&ndlist, nd, i) {
-            print_indent(indent + 1);
+            print_indent(indent + 1, "");
             print_node(nd, indent + 1);
         }
     } else if (var == VARIABLE_ASSIGNMENT) {
@@ -605,7 +605,7 @@ Node parse(Token* src){
     vec_deinit(&p.variables.names);
 
     printf("\033[94mParsed Node:\033[0m\n");
-    print_node(&result);
+    print_node(&result, 0);
 
     return result;
 }

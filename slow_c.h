@@ -4,7 +4,8 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
-#include "vec.c"
+#include <stdbool.h>
+#include "vec.h"
 
 typedef struct Node Node;
 
@@ -53,11 +54,13 @@ typedef struct {
 } Token;
 
 void print_token(Token*);
+void print_error_tok(Token* tk, char* absolute_start);
+Token eat_token(Token** tk, TokenType check);
+Token consume_token(Token** tk);
+Token next_token(Token** tk);
 void printTokens(Token* t);
 bool compare_tokens(Token a, Token b);
 void tokenize(Token* tk, char* src);
-
-#include "tokens.c"
 
 //
 // assembly.c
@@ -126,7 +129,7 @@ typedef enum {
     FUNCTION_NAME,
     NONE
 } InstructionArgs;
-
+typedef struct Instruction Instruction;
 typedef struct Instruction{
     InstructionType type;
     InstructionVal first_arg;
@@ -134,8 +137,6 @@ typedef struct Instruction{
     InstructionArgs args;
     Instruction* next;
 } Instruction;
-
-#include "assembly.c"
 
 //
 // parser.c
@@ -214,7 +215,7 @@ typedef struct Node {
     NodeVal val;
 } Node;
 
-void print_node(Node *node, int indent = 0);
+void print_node(Node*, int);
 void free_node_children(Node* nd);
 Node parse(Token* src);
 InstructionType binop_to_instructiontype(Binop op);
@@ -240,45 +241,10 @@ Node parse_bin_expr(Parser*, Token**);
 Node parse_term(Parser*, Token**);
 Node parse_factor(Parser*, Token**);
 
-#include "parser.c"
-
 //
 // semantic_check.c
 //
 
-#include "semantic_check.c"
-/*
+void semantic_check(Node* root);
 
-//
-// ir.c
-//
-typedef struct IR_val IR_val;
-typedef union IR_val_data {
-    int i;
-    IR_val* p;
-} IR_val_data;
-typedef enum IR_val_type {
-    IR_VAL_INT,
-    IR_VAL_PTR
-} IR_val_type;
-typedef struct IR_val {
-    IR_val_type type;
-    IR_val_data data;
-} IR_val;
-
-typedef struct IR {
-    int index;
-    IR_val l;
-    IR_val r;
-    InstructionType op;
-} IR;
-
-typedef vec_t(IR*) IRList;
-
-void print_ir(IR* ir);
-
-#include "ir.c"
-
-#include "instructions.c"
-*/
 #endif

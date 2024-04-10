@@ -5,18 +5,23 @@ OBJS=$(SRCS:.c=.o)
 
 # Stage 1
 
-chibicc: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+Slow_C: $(OBJS)
+	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	rm *.o
 
-$(OBJS): chibicc.h
+$(OBJS): slow_c.h vec.h
 
-git:
+git_pull:
+	git pull https://github.com/Nacor-MJ/Slow_C/ master
 
+git_push:
+	git push origin master
 
 # Misc.
 
 clean:
-	rm -rf chibicc tmp* $(TESTS) 
-	find * -type f '(' -name '*~' -o -name '*.o' ')' -exec rm {} ';'
+	-rm main.exe.stackdump
+	-rm -rf slow_c tmp* 
+	-rm *.exe
 
 .PHONY: test clean test-stage2

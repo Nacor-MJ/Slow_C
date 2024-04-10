@@ -3,6 +3,8 @@
 
 #include "slow_c.h"
 
+char* global_start_of_file;
+
 Token consume_token(Token** tk){
     Token a = **tk;
     (*tk)++;
@@ -15,8 +17,8 @@ Token eat_token(Token** tk, TokenType check){
         printf("\033[91mInvalid Token, expected: \n\t");
         Token check_tk = {check, {0}, NULL};
         print_token(&check_tk);
-        printf("got: \n\t");
-        print_token(&next);
+        printf("Got:\n\t");
+        print_error_tok(&next, global_start_of_file);
         printf("\033[0m");
         exit(-1);
     }
@@ -160,7 +162,6 @@ void tokenize_comp_operator(Token* tk, char** src){
 
 // Prints The Error message and the line above and below the token
 void print_error_tok(Token* tk, char* absolute_start) {
-    printf("Token: ");
     print_token(tk);
     printf("\n");
     
@@ -171,11 +172,25 @@ void print_error_tok(Token* tk, char* absolute_start) {
         }
         absolute_start++;
     }
-    printf("Line num: %d\n", line_num);
+    printf("\tLine num: %d\n", line_num);
+
+    if (line_num != 1) {
+        line_num--;
+    }
+    
+    for (int i = 0; i < 3; i++ ) {
+        printf("%d | ", line_num + i);
+        while (*absolute_start != '\n' && *absolute_start != '\0') {
+            printf("%c", *absolute_start++);
+        }
+        absolute_start++;
+        printf("\n");
+    }
 }
 
 void tokenize(Token* tk, char* src) {
     char* absolute_start = src;
+    global_start_of_file = src;
     char* start = src;
     skip_whitespace(&src);
     while (*src){
@@ -209,6 +224,14 @@ void tokenize(Token* tk, char* src) {
             case ')':
                 src++;
                 tmp.type = TK_RPAREN;
+                break;
+            case '{':
+                src++;
+                tmp.type = TK_LCURLY;
+                break;
+            case '}':
+                src++;
+                tmp.type = TK_RCURLY;
                 break;
             case ';':
                 src++;
