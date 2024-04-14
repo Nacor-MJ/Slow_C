@@ -34,81 +34,6 @@ void skip_whitespace(char** src) {
         *src += 1;
     }
 }
-
-void print_token(Token* t){
-    switch (t->type) {
-        case TK_PLUS:
-            printf("Token: plus\n");
-            break;
-        case TK_MINUS:
-            printf("Token: minus\n");
-            break;
-        case TK_TIMES:
-            printf("Token: times\n");
-            break;
-        case TK_DIV:
-            printf("Token: div\n");
-            break;
-        case TK_NUM:
-            printf("Token: number");
-            printf(" %d\n", t->data.num);
-            break;
-        case TK_EOF:
-            printf("Token: EOF\n");
-            break;
-        case TK_LPAREN:
-            printf("Token: left paren\n");
-            break;
-        case TK_RPAREN:
-            printf("Token: right paren\n");
-            break;
-        case TK_IDENT:
-            printf("Token: identifier");
-            printf(" '%s'\n", t->data.ident);
-            break;
-        case TK_NE:
-            printf("Token: not equal\n");
-            break;
-        case TK_LT:
-            printf("Token: less than\n");
-            break;
-        case TK_MT:
-            printf("Token: more than\n");
-            break;
-        case TK_ME:
-            printf("Token: more than or equal to\n");
-            break;
-        case TK_LE:
-            printf("Token: less than or equal to\n");
-            break;
-        case TK_EQ:
-            printf("Token: equal\n");
-            break;
-        case TK_SEMICOLON:
-            printf("Token: semicolon\n");
-            break;
-        case TK_TYPE_KEYWORD:
-            printf("Token: Type Keywoard %d\n", t->data.type);
-            break;
-        case TK_ASSIGN:
-            printf("Token: assign\n");
-            break;
-        case TK_COMMA:
-            printf("Token: comma\n");
-            break;
-        default:
-            printf("Unknown token type\n");
-            break;
-    }
-}
-
-void printTokens(Token* t) {
-    while (t->type != TK_EOF){
-        print_token(t);
-        t++;
-    }
-}
-
 void tokenize_num(Token* tk, char** src){
     int num = strtol(*src, src, 0);
     
@@ -250,6 +175,14 @@ void tokenize(Token* tk, char* src) {
             default:
                 if (isdigit((int) *src)){
                     tokenize_num(&tmp, &src);
+                } else if (strncmp(src, "return", 3) == 0) {
+                    src += 6;
+                    tmp.type = TK_RETURN;
+                    tmp.data.type = VOID;
+                } else if (strncmp(src, "void", 3) == 0) {
+                    src += 4;
+                    tmp.type = TK_TYPE_KEYWORD;
+                    tmp.data.type = VOID;
                 } else if (strncmp(src, "int", 3) == 0) {
                     src += 3;
                     tmp.type = TK_TYPE_KEYWORD;
@@ -273,6 +206,7 @@ void tokenize(Token* tk, char* src) {
                     buff = (char*) malloc(i + 1);
                     strncpy(buff, (src - i), i);
                     buff[i] = '\0';
+                    printf("Not freed?: %s\n", buff);
                     tmp.type = TK_IDENT;
                     tmp.data.ident = buff;
                 }

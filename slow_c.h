@@ -39,7 +39,8 @@ typedef enum {
     TK_SEMICOLON,
     TK_ASSIGN,  // =
     TK_COMMA,
-    TK_TYPE_KEYWORD
+    TK_TYPE_KEYWORD,
+    TK_RETURN
 } TokenType;
 typedef union {
     // If you add anything here implement compare_tokens for it
@@ -109,7 +110,7 @@ typedef enum InstructionType {
 
     // functions
     CALL,
-    RETURN,
+    RETURN_INSTR,
 
     // NOP
     NOP
@@ -156,6 +157,7 @@ typedef enum {
     OP_LE,
     OP_MOV // Not really a binop but meh
 } Binop;
+const char* op_enum_to_char(Binop op);
 
 typedef enum {
     VARIABLE_ASSIGNMENT,
@@ -165,7 +167,9 @@ typedef enum {
     BLOCK,
     VAL,
     CONDITIONAL_JUMP,
-    BIN_EXPR
+    BIN_EXPR,
+    PROGRAM,
+    RETURN
 } NodeVar;
 
 typedef struct {
@@ -174,8 +178,9 @@ typedef struct {
     Node* r;
 } BinExpr;
 
+// TODO make this vec_t(Node) 
+// i.e. remove the pointer, it's a mess
 typedef vec_t(Node*) NodeList;
-
 
 typedef struct {
     Type type;
@@ -190,6 +195,7 @@ typedef struct {
     Type type;
     char* name;
     Node* val;
+    bool is_declaration;
 } VariableAssignment;
 
 typedef struct Conditional_jump {
@@ -205,9 +211,11 @@ typedef union {
     FunctionCall function_call;
     FunctionDefinition function_definition;
     NodeList block;
+    NodeList program;
     int val;
     Conditional_jump* conditional_jump;
     BinExpr* bin_expr;
+    Node* return_;
 } NodeVal;
 
 typedef struct Node {
@@ -218,7 +226,6 @@ typedef struct Node {
 void print_node(Node*, int);
 void free_node_children(Node* nd);
 Node parse(Token* src);
-InstructionType binop_to_instructiontype(Binop op);
 
 typedef vec_t(char*) VariablesNames;
 typedef vec_t(Type) VariablesTypes;
@@ -235,16 +242,35 @@ typedef struct Parser {
 Node parse_program(Parser*, Token**);
 Node parse_statement(Parser*, Token**);
 Node parse_expr(Parser*, Token**);
-Node parse_eq_ne(Parser*, Token**);
-Node parse_comp_expr(Parser*, Token**);
-Node parse_bin_expr(Parser*, Token**);
-Node parse_term(Parser*, Token**);
-Node parse_factor(Parser*, Token**);
+
+Node parse_function_definition(Parser* p, Token** tk, Type return_type, char* fn_name);
 
 //
 // semantic_check.c
 //
 
 void semantic_check(Node* root);
+
+//
+// fortran.c
+//
+
+void generate_ir(FILE* file, Node* root);
+void node_to_ir(FILE* file, Node *nd);
+void bin_expr_to_ir(FILE* file, BinExpr* expr);
+void conditional_jump_to_ir(FILE* file, Conditional_jump* jump);
+void fprintf_val(FILE* file, int val);
+void block_to_ir(FILE* file, NodeList block, int indent);
+void function_definition_to_ir(FILE* file, FunctionDefinition definition);
+void function_call_to_ir(FILE* file, FunctionCall call);
+void variable_assignment_to_ir(FILE* file, VariableAssignment *assignment);
+void fprint_ident(FILE* file, char* ident);
+void fprint_type(FILE* file, Type type);
+
+//
+// print.c
+//
+
+const char* type_to_string(Type);
 
 #endif

@@ -31,44 +31,12 @@ char* load_file(char const* path)
     return buffer;
 }
 
-void compile(char* file_path, char* ir) {
-    // Compiling ig
-    char out[64] = "";
-    strncpy(out, file_path, 60);
-    strcat(out, ".S");
+void compile_fortran(char* file_path) {
+    char command[256];
 
-    FILE* fptr = fopen(out, "w");
-    fprintf(fptr, "\t.text \n\t.globl main\n\t.intel_syntax noprefix\n\t.def\tmain\nmain:\n" );
-    fprintf(fptr, ir);
-    fprintf(fptr, "\tret\n");
-    fclose(fptr);
-    
-    char ass[128] = "";
-    char link[128] = "";
+    sprintf(command, "gfortran -o %s.exe %s.f90", file_path, file_path);
 
-    sprintf(ass, "gcc -c %s.S -o %s.o", file_path, file_path);
-    sprintf(link, "gcc %s.o -o %s.exe", file_path, file_path);
-
-    // assembly
-    if (0 != system(ass)) {
-        printf("Failed to assemble %s\n", file_path);
-        exit(-1);
-    }
-    printf("Successfully assembled\n");
-
-    // linking
-    if (0 != system(link)){
-        printf("Failed to link %s\n", file_path);
-        exit(-1);
-    }
-
-    printf("Successfully compiled %s\n", file_path);
-
-    char tmp[64] = "";
-    sprintf(tmp,"%s.o", file_path);
-    remove(tmp);
-    // sprintf(tmp,"%s.S", file_path);
-    // remove(tmp);
+    system(command);
 }
 
 int main(int argc, char *argv[]) {
@@ -77,12 +45,14 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    char* file_path = argv[1];
+    char* file_path_with_extenstion = argv[1];
 
-    printf("Compiling %s\n", file_path);
-    char* buff = load_file(file_path);
+    printf("\033[94mCompiling %s\033[0m\n", file_path_with_extenstion);
+    char* buff = load_file(file_path_with_extenstion);
 
-    // printf("Src: %s\n", buff);
+    char file_path[strlen(file_path_with_extenstion) - 4];
+    strncpy(file_path, file_path_with_extenstion, strlen(file_path_with_extenstion) - 4);
+    file_path[strlen(file_path_with_extenstion) - 4] = '\0';
 
     // ------------ Tokenize --------------
     Token *tokens = (Token*) calloc(40, sizeof(Token));
@@ -99,38 +69,22 @@ int main(int argc, char *argv[]) {
 
     // ------------ Semantic Checks -------------
 
+    printf("\033[94mSemantic Checks:\033[0m\n");
     semantic_check(nd);
-    
-    /*
-    // ------------ IR --------------
-    IRList ir;
-    vec_init(&ir);
 
-    node_to_ir(nd, &ir);
+    // ----------- Generate IR ------------
 
-    printf("\033[92mIR:\033[0m\n");
-    int i; IR* ir2;
-    vec_foreach(&ir, ir2, i) {
-        print_ir(ir2);
-    }
-    exit(0);
+    printf("\033[94mGenerating IR:\033[0m\n");
+    char file_name_buff[64] = "";
+    strncpy(file_name_buff, file_path, 60);
+    strcat(file_name_buff, ".f90");
 
-    Instruction* start = empty_instruction();
+    FILE* ir = fopen(file_name_buff, "w");
+    generate_ir(ir, nd);
+    fclose(ir);
 
-    start->next = NULL;
-
-    char ir[256] = {'\0'};
-    inst_seq_to_char(start, ir);
-
-    // ------------ Assembly --------------
-
-    char out[64] = ""; // filename 
-    strncpy(out, file_path, strlen(file_path) - 4);
-    compile(out, ir);
-
-    free_instr_and_children(start);
-    vec_deinit(&ir);
-    */
+    printf("\033[94mCompiling:\033[0m\n");
+    compile_fortran(file_path);
 
     free(tokens);
     free_node_children(nd);
