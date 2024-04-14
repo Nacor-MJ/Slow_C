@@ -82,6 +82,8 @@ Type get_var_type(Parser* p, Token var){
     int idx;
     vec_find_custom_comp_func(&p->variables.names, var.data.ident, idx, strcmp);
     if (idx == -1) {
+        printf("Variables: \n");
+        print_vars(p);
         printf("Variable '%s' doesn't exist\n", var.data.ident);
         print_error_tok(&var, p->absolute_start);
         exit(-1);
@@ -137,7 +139,7 @@ Node parse_statement(Parser* p, Token** tk) {
             return nd;
         // Function
         } else {
-            return parse_function_definition(p, tk, type_tk.data.type, name.data.ident);
+            return parse_function_definition(p, tk, type_tk.data.type, name);
         }
     // Variable redeclaration
     } else if (next_token(tk).type == TK_IDENT) {
@@ -166,6 +168,9 @@ Node parse_statement(Parser* p, Token** tk) {
             // function_call
         } else {
             NodeVal nv;
+
+            nv.function_call.name = var.data.ident;
+            nv.function_call.type = get_var_type(p, var);
 
             vec_init(&nv.function_call.args);
 
@@ -219,7 +224,8 @@ Node* parse_next_statement(Parser* p, Token** tk) {
     return result;
 }
 
-Node parse_function_definition(Parser* p, Token** tk, Type return_type, char* fn_name) {
+Node parse_function_definition(Parser* p, Token** tk, Type return_type, Token fn_name) {
+    add_variable(p, fn_name, return_type);
     eat_token(tk, TK_LPAREN);
     
     NodeList args;
@@ -234,10 +240,11 @@ Node parse_function_definition(Parser* p, Token** tk, Type return_type, char* fn
 
     eat_token(tk, TK_RCURLY);
 
+
     NodeVal fn_val;
     FunctionCall fc = {
         return_type,
-        fn_name,
+        fn_name.data.ident,
         args
     };
     FunctionDefinition fd = {
@@ -275,11 +282,21 @@ Node parse_from_tok(Parser* p, Token* tk){
 
     return program;
 }
+void add_predifined_functions(Parser* p);
 
 Node parse(Token* src){
     Parser p;
     vec_init(&p.variables.names);
     vec_init(&p.variables.types);
+
+    TokenData td;
+    td.ident = "print";
+    Token print_tk = {
+        TK_IDENT,
+        td,
+        NULL,
+    };
+    add_variable(&p, print_tk, VOID);
 
     p.absolute_start = src->start_of_token;
 
@@ -288,9 +305,8 @@ Node parse(Token* src){
     vec_deinit(&p.variables.types);
     vec_deinit(&p.variables.names);
 
-    printf("\033[94mParsed Node:\033[0m\n");
-    print_node(&result, 0);
     return result;
 }
+
 
 #endif

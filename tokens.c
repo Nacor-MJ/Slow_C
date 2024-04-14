@@ -206,7 +206,6 @@ void tokenize(Token* tk, char* src) {
                     buff = (char*) malloc(i + 1);
                     strncpy(buff, (src - i), i);
                     buff[i] = '\0';
-                    printf("Not freed?: %s\n", buff);
                     tmp.type = TK_IDENT;
                     tmp.data.ident = buff;
                 }

@@ -10,7 +10,7 @@ void fprint_current_indent(FILE* file) {
 
 
 void fprint_type(FILE* file, Type type) {
-    fprintf(file, "%s", type_to_string(type));
+    fprintf(file, "%s ", type_to_string(type));
 }
 
 void fprint_ident(FILE* file, char* ident) {
@@ -20,7 +20,7 @@ void fprint_ident(FILE* file, char* ident) {
 void variable_definition_to_ir(FILE* file, VariableAssignment* definition) {
     fprint_current_indent(file);
     fprint_type(file, definition->type);
-    fprintf(file, " :: ");
+    fprintf(file, ":: ");
     fprint_ident(file, definition->name);
     fprintf(file, "\n");
 }
@@ -37,17 +37,21 @@ void variable_assignment_to_ir(FILE* file, VariableAssignment *assignment) {
 void function_call_to_ir(FILE* file, FunctionCall call) {
     fprint_current_indent(file);
     fprint_ident(file, call.name);
-    fprintf(file, "(");
+    if (call.type == VOID) {
+        if (strcmp(call.name, "print") == 0) fprintf(file, " *,");
+    }
+    fprintf(file, " ");
     for (int i = 0; i < call.args.length ; i++) {
         if (i) fprintf(file, ", ");
         node_to_ir(file, call.args.data[i]);
     }
-    fprintf(file, ")");
+    fprintf(file, "\n");
 }
 
 void function_definition_to_ir(FILE* file, FunctionDefinition definition) {
     FunctionCall signature = definition.signature;
     if (strcmp(signature.name, "main") != 0) {
+        fprint_current_indent(file);
         current_indent += 1;
         fprint_type(file, signature.type);
         fprint_ident(file, signature.name);
@@ -73,6 +77,7 @@ void block_to_ir(FILE* file, NodeList block, int indent) {
     for (int i = 0; i < block.length; i++) {
         node_to_ir(file, block.data[i]);
     }
+    fprintf(file, "\n");
 }
 
 void fprintf_val(FILE* file, int val) {

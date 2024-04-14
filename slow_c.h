@@ -243,7 +243,7 @@ Node parse_program(Parser*, Token**);
 Node parse_statement(Parser*, Token**);
 Node parse_expr(Parser*, Token**);
 
-Node parse_function_definition(Parser* p, Token** tk, Type return_type, char* fn_name);
+Node parse_function_definition(Parser* p, Token** tk, Type return_type, Token fn_name);
 
 //
 // semantic_check.c
@@ -272,5 +272,6 @@ void fprint_type(FILE* file, Type type);
 //
 
 const char* type_to_string(Type);
+void print_vars(Parser* p);
 
 #endif

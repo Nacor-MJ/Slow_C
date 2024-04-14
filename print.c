@@ -41,6 +41,7 @@ void print_indent(int level, const char* end) {
 void print_program(NodeList block, int indent) {
     int i; Node* nd;
     vec_foreach(&block, nd, i) {
+        print_indent(indent, "");
         print_node(nd, indent);
     }
 }
@@ -84,12 +85,10 @@ void print_node(Node *node, int indent) {
         print_node(va->val, indent + 1);
     } else if (var == FUNCTION_CALL) {
         FunctionCall fc = node->val.function_call;
-        printf("Function Call: %s\n", fc.name);
-        NodeList ndlist = fc.args;
-        int i; Node* nd;
-        vec_foreach(&ndlist, nd, i) {
-            print_node(nd, indent + 1);
-        }
+        printf("Function Call: %s (\n", fc.name);
+        print_program(fc.args, indent + 1);
+        print_indent(indent, "");
+        printf(")\n");
     } else if (var == VARIABLE_IDENT) {
         printf("$%s\n", node->val.variable_ident);
     } else if (var == RETURN) {

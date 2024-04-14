@@ -67,6 +67,9 @@ int main(int argc, char *argv[]) {
 
     *nd = parse(tokens);
 
+    printf("\033[94mParsed Node:\033[0m\n");
+    print_node(nd, 0);
+
     // ------------ Semantic Checks -------------
 
     printf("\033[94mSemantic Checks:\033[0m\n");
