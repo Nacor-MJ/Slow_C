@@ -4,11 +4,15 @@
 #include "slow_c.h"
 // #define DBG 1
 
+char current_file[256];
+
 char* load_file(char const* path)
 {
     char* buffer = 0;
     long length;
     FILE * f = fopen (path, "rb");
+
+    strcpy(current_file, path);
 
     if (f)
     {
@@ -23,7 +27,7 @@ char* load_file(char const* path)
       fclose (f);
     } else {
         printf("Failed to open %s\n", path);
-        exit(-1);
+        my_exit(-1);
     }
 
     buffer[length] = '\0';
@@ -31,18 +35,10 @@ char* load_file(char const* path)
     return buffer;
 }
 
-void compile_fortran(char* file_path) {
-    char command[256];
-
-    sprintf(command, "gfortran -o %s.exe %s.f90", file_path, file_path);
-
-    system(command);
-}
-
 int main(int argc, char *argv[]) {
     if (argc < 2){
         printf("Failed to provide program name\n");
-        exit(-1);
+        my_exit(-1);
     }
 
     char* file_path_with_extenstion = argv[1];
@@ -55,25 +51,24 @@ int main(int argc, char *argv[]) {
     file_path[strlen(file_path_with_extenstion) - 4] = '\0';
 
     // ------------ Tokenize --------------
-    Token *tokens = (Token*) calloc(40, sizeof(Token));
-    if (tokens == NULL) exit(69);
-    tokenize(tokens, buff);
-    
+    TokenList tokens;
+    vec_init(&tokens);
+    tokens.pars_ptr = 0;
+    tokenize(&tokens, buff);
+
     // printf("\033[94mParsed Tokens:\033[0m\n");
     // printTokens(tokens);
 
     // ------------ Parse --------------
-    Node* nd = (Node*) malloc(sizeof(Node));
+    Program program = parse(tokens);
 
-    *nd = parse(tokens);
-
-    printf("\033[94mParsed Node:\033[0m\n");
-    print_node(nd, 0);
+    printf("\033[94mParsed Expr:\033[0m\n");
+    print_program(&program, 0);
 
     // ------------ Semantic Checks -------------
 
     printf("\033[94mSemantic Checks:\033[0m\n");
-    semantic_check(nd);
+    semantic_check(&program);
 
     // ----------- Generate IR ------------
 
@@ -83,14 +78,16 @@ int main(int argc, char *argv[]) {
     strcat(file_name_buff, ".f90");
 
     FILE* ir = fopen(file_name_buff, "w");
-    generate_ir(ir, nd);
+    // generate_ir(ir, &program);
     fclose(ir);
 
     printf("\033[94mCompiling:\033[0m\n");
-    compile_fortran(file_path);
 
-    free(tokens);
-    free_node_children(nd);
+    // ---------- Convert to ASM ----------
+
+    // ---------- Cleanup ----------
+    vec_deinit(&tokens);
+    free_stmt_list((StmtList) program);
     free(buff);
 	return 0;
 }

@@ -38,69 +38,86 @@ void print_indent(int level, const char* end) {
     printf("%s", end);
 }
 
-void print_program(NodeList block, int indent) {
-    int i; Node* nd;
-    vec_foreach(&block, nd, i) {
+void print_program(Program* block, int indent) {
+    int i; Statement nd;
+    vec_foreach(block, nd, i) {
         print_indent(indent, "");
-        print_node(nd, indent);
+        print_statement(&nd, indent);
     }
 }
 
-void print_block(NodeList block, int indent) {
+void print_block(StmtList block, int indent) {
     printf("{\n");
-    print_program(block, indent + 1);
+    print_program(&block, indent + 1);
     printf("}\n");
 }
 
-void print_node(Node *node, int indent) {
+void print_expr_list(ExprList list, int indent) {
+    int i; Expr nd;
+    vec_foreach(&list, nd, i) {
+        print_expr(&nd, indent);
+    }
+}
+
+void print_statement(Statement* stmt, int indent) {
+    StmtVar var = stmt->var;
+    if (var == STMT_VARIABLE_ASSIGNMENT) {
+        VariableAssignment va = stmt->val.variable_assignment;
+        printf("%s = ", va.name);
+        print_expr(&va.val, indent);
+        printf(";\n");
+    } else if (var == STMT_FUNCTION_DEFINITION) {
+        FunctionDefinition fd = stmt->val.function_definition;
+        printf("Function: %s(\n", fd.signature.name);
+        print_program(&fd.body, indent + 1);
+        printf(");\n");
+    } else if (var == STMT_BLOCK) {
+        print_block(stmt->val.block, indent);
+    } else if (var == STMT_PROGRAM) {
+        print_program(&stmt->val.program, indent);
+    } else if (var == STMT_RETURN) {
+        printf("return ");
+        print_expr(&stmt->val.return_, indent);
+        printf(";\n");
+    } else if (var == STMT_THROWAWAY) {
+        print_expr(&stmt->val.throw_away, indent);
+        printf(";\n");
+    } else {
+        printf("print_statement not implemented for: %d\n", stmt->var);
+        my_exit(-1);
+    }
+}
+
+void print_expr(Expr *node, int indent) {
     if (node == NULL) {
-        // printf("NULL Node\n");
+        // printf("NULL Expr\n");
         return;
     }
     
-    NodeVar var = node->var;
+    ExprVar var = node->var;
     
     if (var == VAL) {
         printf("#%d\n", node->val.val);
     } else if (var == BIN_EXPR) {
         printf("{\n");
         print_indent(indent, "");
-        print_node(node->val.bin_expr->l, indent + 1);
+        print_expr(node->val.bin_expr->l, indent + 1);
         print_indent(indent, "");
         printf("%s\n", op_enum_to_char(node->val.bin_expr->op));
         print_indent(indent, "");
-        print_node(node->val.bin_expr->r, indent + 1);
+        print_expr(node->val.bin_expr->r, indent + 1);
         print_indent(indent - 1, "");
         printf("}\n");
-    } else if (var == PROGRAM) {
-        print_indent(indent, "");
-        NodeList ndlist = node->val.block;
-        print_program(ndlist, indent);
-    } else if (var == BLOCK) {
-        NodeList ndlist = node->val.block;
-        print_block(ndlist, indent + 1);
-    } else if (var == VARIABLE_ASSIGNMENT) {
-        VariableAssignment* va = node->val.variable_assignment;
-        printf("%s %s = ", type_to_string(va->type), va->name);
-        print_node(va->val, indent + 1);
     } else if (var == FUNCTION_CALL) {
         FunctionCall fc = node->val.function_call;
         printf("Function Call: %s (\n", fc.name);
-        print_program(fc.args, indent + 1);
+        print_expr_list(fc.args, indent + 1);
         print_indent(indent, "");
         printf(")\n");
     } else if (var == VARIABLE_IDENT) {
         printf("$%s\n", node->val.variable_ident);
-    } else if (var == RETURN) {
-        printf("return ");
-        print_node(node->val.return_, indent + 1);
-    } else if (var == FUNCTION_DEFINITION) {
-        FunctionDefinition fd = node->val.function_definition;
-        printf("%s %s ", type_to_string(fd.signature.type), fd.signature.name);
-        NodeList ndlist = fd.body;
-        print_block(ndlist, indent + 1);
     } else {
-        printf("print_node not implemented for node type: %d\n", node->var);
+        printf("print_expr not implemented for: %d\n", node->var);
     }
 }
 
@@ -114,84 +131,97 @@ void print_vars(Parser* p) {
 void print_token(Token* t){
     switch (t->type) {
         case TK_PLUS:
-            printf("Token: plus\n");
+            printf("+");
             break;
         case TK_MINUS:
-            printf("Token: minus\n");
+            printf("-");
             break;
         case TK_TIMES:
-            printf("Token: times\n");
+            printf("*");
             break;
         case TK_DIV:
-            printf("Token: div\n");
+            printf("/");
             break;
         case TK_NUM:
-            printf("Token: number");
-            printf(" %d\n", t->data.num);
+            printf("$%d", t->data.num);
             break;
         case TK_EOF:
-            printf("Token: EOF\n");
+            printf("EOF");
             break;
         case TK_LCURLY:
-            printf("Token: left curly paren\n");
+            printf("{");
             break;
         case TK_RCURLY:
-            printf("Token: right curly paren\n");
+            printf("}");
             break;
         case TK_LPAREN:
-            printf("Token: left paren\n");
+            printf("(");
             break;
         case TK_RPAREN:
-            printf("Token: right paren\n");
+            printf(")");
             break;
         case TK_IDENT:
-            printf("Token: identifier");
-            printf(" '%s'\n", t->data.ident);
+            printf(" '%s'", t->data.ident);
             break;
         case TK_NE:
-            printf("Token: not equal\n");
+            printf("!=");
             break;
         case TK_LT:
-            printf("Token: less than\n");
+            printf("<");
             break;
         case TK_MT:
-            printf("Token: more than\n");
+            printf(">");
             break;
         case TK_ME:
-            printf("Token: more than or equal to\n");
+            printf(">=");
             break;
         case TK_LE:
-            printf("Token: less than or equal to\n");
+            printf("<=");
             break;
         case TK_EQ:
-            printf("Token: equal\n");
+            printf("==");
             break;
         case TK_SEMICOLON:
-            printf("Token: semicolon\n");
+            printf(";");
             break;
         case TK_TYPE_KEYWORD:
-            printf("Token: Type Keywoard %d\n", t->data.type);
+            switch (t->data.type) {
+                case VOID:
+                    printf("void");
+                    break;
+                case INT:
+                    printf("int");
+                    break;
+                case NONE_TYPE:
+                    printf("TYPE");
+                    break;
+                default:
+                    printf("Unknown type keyword: %d", t->data.type);
+            }
             break;
         case TK_ASSIGN:
-            printf("Token: assign\n");
+            printf("=");
             break;
         case TK_RETURN:
-            printf("Token: return\n");
+            printf("return");
             break;
         case TK_COMMA:
-            printf("Token: comma\n");
+            printf(",");
             break;
         default:
-            printf("Unknown token type %d\n", t->type);
+            printf("Tk.type %d", t->type);
             break;
     }
 }
 
-void printTokens(Token* t) {
-    while (t->type != TK_EOF){
-        print_token(t);
-        t++;
+void printTokens(TokenList* t) {
+    printf("\n");
+    for (int i = 0; i < t->length; i++) {
+        print_token(&t->data[i]);
+        TokenType tp = t->data[i].type;
+        if (tp == TK_SEMICOLON || tp == TK_RCURLY || tp == TK_LCURLY) printf("\n");
     }
+    printf("\n");
 }
 
 const char* type_to_string(Type type) {

@@ -3,7 +3,7 @@
 
 #include "slow_c.h"
 
-void semantic_check(Node* root) {
+void semantic_check(Program* root) {
     // TODO
     return ;
 }

@@ -7,11 +7,18 @@
 #include <stdbool.h>
 #include "vec.h"
 
-typedef struct Node Node;
+#define my_exit(i) \
+    printf("\033[31mError %d in %s:%d\033[0m\n", i, __FILE__, __LINE__); \
+    *(int*)0 = 0;\
+    exit(0);
+
+typedef struct Expr Expr;
+typedef struct Statement Statement;
 
 typedef enum Type {
-    INT,
-    VOID
+    NONE_TYPE,
+    VOID,
+    INT
 } Type;
 
 //
@@ -40,13 +47,14 @@ typedef enum {
     TK_ASSIGN,  // =
     TK_COMMA,
     TK_TYPE_KEYWORD,
-    TK_RETURN
+    TK_RETURN,
+    TK_COMMENT
 } TokenType;
 typedef union {
     // If you add anything here implement compare_tokens for it
     int num;
     char* ident;
-    Type type; 
+    Type type;
 } TokenData;
 typedef struct {
     TokenType type;
@@ -54,14 +62,24 @@ typedef struct {
     char* start_of_token;
 } Token;
 
+// if you change vec_t this will get fucked up <3
+typedef struct { 
+    Token *data;
+    int length;
+    int capacity;
+    int pars_ptr;
+} TokenList;
+
 void print_token(Token*);
-void print_error_tok(Token* tk, char* absolute_start);
-Token eat_token(Token** tk, TokenType check);
-Token consume_token(Token** tk);
-Token next_token(Token** tk);
-void printTokens(Token* t);
+void print_error_tok(Token*, char*);
+Token eat_token(TokenList* tk, TokenType check);
+Token consume_token(TokenList* tk);
+Token next_token(TokenList* tk);
+Token* next_token_ptr(TokenList* tk);
+Token next_token_with_offset(TokenList* tk, int offset);
+void printTokens(TokenList* t);
 bool compare_tokens(Token a, Token b);
-void tokenize(Token* tk, char* src);
+void tokenize(TokenList* tk, char* src);
 
 //
 // assembly.c
@@ -159,73 +177,87 @@ typedef enum {
 } Binop;
 const char* op_enum_to_char(Binop op);
 
-typedef enum {
-    VARIABLE_ASSIGNMENT,
-    VARIABLE_IDENT,
-    FUNCTION_CALL,
-    FUNCTION_DEFINITION,
-    BLOCK,
-    VAL,
-    CONDITIONAL_JUMP,
-    BIN_EXPR,
-    PROGRAM,
-    RETURN
-} NodeVar;
+typedef vec_t(Expr) ExprList;
+
+typedef vec_t(Statement) StmtList;
+
+typedef StmtList Program;
 
 typedef struct {
-    Node* l;
+    Expr* l;
     Binop op;
-    Node* r;
+    Expr* r;
 } BinExpr;
-
-// TODO make this vec_t(Node) 
-// i.e. remove the pointer, it's a mess
-typedef vec_t(Node*) NodeList;
 
 typedef struct {
     Type type;
     char* name;
-    NodeList args;
+    ExprList args;
 } FunctionCall;
+
+typedef union {
+    char* variable_ident;
+    FunctionCall function_call;
+    int val;
+    BinExpr* bin_expr;
+} ExprVal;
+typedef enum {
+    VARIABLE_IDENT,
+    FUNCTION_CALL,
+    VAL,
+    BIN_EXPR,
+} ExprVar;
+typedef struct Expr {
+    ExprVar var;
+    ExprVal val;
+} Expr;
+
+
 typedef struct {
     FunctionCall signature;
-    NodeList body;
+    StmtList body;
 } FunctionDefinition;
 typedef struct {
     Type type;
     char* name;
-    Node* val;
-    bool is_declaration;
+    Expr val;
+    int version;
 } VariableAssignment;
-
 typedef struct Conditional_jump {
-    Node* condition;
-    Node* true_block;
-    Node* false_block;
-    Node* next;
+    Expr* condition;
+    Expr* true_block;
+    Expr* false_block;
+    Expr* next;
 } Conditional_jump;
 
-typedef union {
-    VariableAssignment* variable_assignment;
-    char* variable_ident;
-    FunctionCall function_call;
+typedef union StmtVal {
+    VariableAssignment variable_assignment;
     FunctionDefinition function_definition;
-    NodeList block;
-    NodeList program;
-    int val;
-    Conditional_jump* conditional_jump;
-    BinExpr* bin_expr;
-    Node* return_;
-} NodeVal;
+    Conditional_jump conditional_jump;
+    StmtList block;
+    Program program;
+    Expr return_;
+    Expr throw_away;
+} StmtVal;
+typedef enum StmtVar {
+    STMT_VARIABLE_ASSIGNMENT,
+    STMT_FUNCTION_DEFINITION,
+    STMT_CONDITIONAL_JUMP,
+    STMT_BLOCK,
+    STMT_PROGRAM,
+    STMT_RETURN,
+    STMT_THROWAWAY
+} StmtVar;
+typedef struct Statement {
+    StmtVar var;
+    StmtVal val;
+} Statement;
 
-typedef struct Node {
-    NodeVar var;
-    NodeVal val;
-} Node;
-
-void print_node(Node*, int);
-void free_node_children(Node* nd);
-Node parse(Token* src);
+void print_program(Program*, int);
+void print_statement(Statement*, int);
+void print_expr(Expr*, int);
+void free_stmt_list(StmtList);
+Program parse(TokenList src);
 
 typedef vec_t(char*) VariablesNames;
 typedef vec_t(Type) VariablesTypes;
@@ -239,33 +271,29 @@ typedef struct Parser {
     char* absolute_start;
 } Parser;
 
-Node parse_program(Parser*, Token**);
-Node parse_statement(Parser*, Token**);
-Node parse_expr(Parser*, Token**);
+Program parse_program(Parser*, TokenList*);
+StmtList parse_block(Parser* p, TokenList* tk);
+Statement parse_statement(Parser* p, TokenList* tk);
 
-Node parse_function_definition(Parser* p, Token** tk, Type return_type, Token fn_name);
+Statement parse_function_definition(Parser* p, TokenList* tk);
+
+Type get_var_type(Parser* p, Token var);
+void parse_arg_list(Parser*p, TokenList* tk, ExprList* list);
+
+//
+// expr.c
+//
+
+Expr zero_expr();
+Expr parse_function_call(Parser* p, TokenList* tk);
+Expr parse_expr(Parser*, TokenList*);
+
 
 //
 // semantic_check.c
 //
 
-void semantic_check(Node* root);
-
-//
-// fortran.c
-//
-
-void generate_ir(FILE* file, Node* root);
-void node_to_ir(FILE* file, Node *nd);
-void bin_expr_to_ir(FILE* file, BinExpr* expr);
-void conditional_jump_to_ir(FILE* file, Conditional_jump* jump);
-void fprintf_val(FILE* file, int val);
-void block_to_ir(FILE* file, NodeList block, int indent);
-void function_definition_to_ir(FILE* file, FunctionDefinition definition);
-void function_call_to_ir(FILE* file, FunctionCall call);
-void variable_assignment_to_ir(FILE* file, VariableAssignment *assignment);
-void fprint_ident(FILE* file, char* ident);
-void fprint_type(FILE* file, Type type);
+void semantic_check(Program* root);
 
 //
 // print.c
