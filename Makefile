@@ -18,11 +18,10 @@ test_idk: Slow_C
 	./Slow_C.exe idk.txt 
 	-./idk.exe
 
-git_pull:
-	git pull https://github.com/Nacor-MJ/Slow_C/ master
+git:
+	Set-ExecutionPolicy AllSigned
+	./git.ps1
 
-git_push:
-	git push origin master
 
 # Misc.
 
