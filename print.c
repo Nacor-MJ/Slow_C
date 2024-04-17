@@ -59,22 +59,33 @@ void print_expr_list(ExprList list, int indent, const char* separator) {
         printf("%s", separator);
     }
 }
+void print_stmt_list(StmtList list, int indent, const char* separator) {
+    int i; Statement nd;
+    vec_foreach(&list, nd, i) {
+        print_statement(&nd, indent);
+        printf("%s", separator);
+    }
+}
 
 void print_statement(Statement* stmt, int indent) {
     StmtVar var = stmt->var;
     if (var == STMT_VARIABLE_ASSIGNMENT) {
         VariableAssignment va = stmt->val.variable_assignment;
-        printf("%s%d = ", va.name, va.version);
-        print_expr(&va.val, indent);
+        print_type_keyword(va.type);
+        printf(" %s%d", va.name, va.version);
+        if (va.val.var != EMPTY_EXPR) {
+            printf(" = ");
+            print_expr(&va.val, indent);
+        }
         printf(";\n");
     } else if (var == STMT_FUNCTION_DEFINITION) {
         FunctionDefinition fd = stmt->val.function_definition;
-        print_type_keyword(fd.signature.type);
-        printf(" %s(", fd.signature.name);
-        if (fd.signature.args.length > 0) {
+        print_type_keyword(fd.type);
+        printf(" %s(", fd.name);
+        if (fd.args.length > 0) {
             printf("\n");
             print_indent(indent + 1, "");
-            print_expr_list(fd.signature.args, indent + 1, ", ");
+            print_stmt_list(fd.args, indent + 1, "");
         }
         print_indent(indent, ")");
         printf("{\n");

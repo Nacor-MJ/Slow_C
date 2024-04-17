@@ -214,6 +214,11 @@ typedef enum {
     FUNCTION_CALL,
     BIN_EXPR
 } ExprVar;
+typedef struct Variable {
+    char* name;
+    int version;
+    Type type;
+} Variable;
 typedef struct Expr {
     ExprVar var;
     ExprVal val;
@@ -221,7 +226,9 @@ typedef struct Expr {
 
 
 typedef struct {
-    FunctionCall signature;
+    Type type;
+    char* name;
+    StmtList args;
     StmtList body;
 } FunctionDefinition;
 typedef struct {
@@ -292,7 +299,9 @@ Statement parse_statement(Scope* p, TokenList* tk);
 
 Statement parse_function_definition(Scope* p, TokenList* tk);
 
-void parse_arg_list(Scope*p, TokenList* tk, ExprList* list);
+void parse_arg_list(Scope*p, TokenList* tk, StmtList* list);
+void append_statement(StmtList* list, Statement nd);
+void append_expr(ExprList* list, Expr nd);
 
 //
 // scope.c

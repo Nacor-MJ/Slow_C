@@ -10,12 +10,35 @@ void append_expr(ExprList* list, Expr nd) {
     vec_push(list, nd);
     #pragma GCC diagnostic pop
 }
+void append_statement(StmtList* list, Statement nd) {
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-value"
+    vec_push(list, nd);
+    #pragma GCC diagnostic pop
+}
 
-void parse_arg_list(Scope*p, TokenList* tk, ExprList* list) {
+void parse_arg_list(Scope*p, TokenList* tk, StmtList* list) {
     while (next_token(tk).type != TK_RPAREN) {
-        Expr nd = parse_expr(p, tk);
+        Token type_tk = eat_token(tk, TK_TYPE_KEYWORD);
+        Token name = eat_token(tk, TK_IDENT);
+        add_variable(p, name, type_tk.data.type);
+
+        StmtVal sv;
+        VariableAssignment va = {
+            type_tk.data.type,
+            name.data.ident,
+            zero_expr(),
+            0
+        };
+        sv.variable_assignment = va; 
+        Statement nd = (Statement) {
+            STMT_VARIABLE_ASSIGNMENT,
+            sv
+        };
+
+        append_statement(list, nd);
+
         if (next_token(tk).type != TK_RPAREN) eat_token(tk, TK_COMMA);
-        append_expr(list, nd);
     }
 }
 
@@ -91,20 +114,15 @@ Statement parse_statement(Scope* p, TokenList* tk) {
         if (next_token_with_offset(tk, 1).type == TK_ASSIGN) {
             return parse_var_redeclaration(p, tk);
             // function_call
-        } else if (next_token_with_offset(tk, 1).type == TK_LPAREN) {
+        } else {
             StmtVal sv;
-            sv.throw_away = parse_function_call(p, tk);
+            sv.throw_away = parse_expr(p, tk);
             Statement rst = {
                 STMT_THROWAWAY,
                 sv
             };
             eat_token(tk, TK_SEMICOLON);
             return rst;
-        } else {
-            get_var_version(p, next);
-            printf("Expected redeclaration or function call got ");
-            print_error_tok(&next, absolute_start);
-            my_exit(-1);
         }
     } else if (next.type == TK_RETURN) {
         consume_token(tk);
@@ -131,7 +149,7 @@ Statement parse_function_definition(Scope* p, TokenList* tk) {
     add_variable(p, name, type_tk.data.type);
     eat_token(tk, TK_LPAREN);
     
-    ExprList args;
+    StmtList args;
     vec_init(&args);
 
     parse_arg_list(p, tk, &args);
@@ -139,19 +157,18 @@ Statement parse_function_definition(Scope* p, TokenList* tk) {
     eat_token(tk, TK_RPAREN);
     eat_token(tk, TK_LCURLY);
 
-    StmtList body = parse_block(p, tk);
+    Scope* subscope = new_scope(p);
+
+    StmtList body = parse_block(subscope, tk);
 
     eat_token(tk, TK_RCURLY);
 
     if (next_token(tk).type == TK_SEMICOLON) eat_token(tk, TK_SEMICOLON);
 
-    FunctionCall fc = {
+    FunctionDefinition fd = {
         type_tk.data.type,
         name.data.ident,
-        args
-    };
-    FunctionDefinition fd = {
-        fc,
+        args,
         body
     };
     StmtVal sv;
@@ -167,11 +184,9 @@ StmtList parse_block(Scope* p, TokenList* tk) {
     StmtList result;
     vec_init(&result);
 
-    Scope* scope = new_scope(p);
-
     Statement next;
     while (next_token(tk).type != TK_RCURLY) {
-        next = parse_statement(scope, tk);
+        next = parse_statement(p, tk);
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wunused-value"
         vec_push(&result, next);

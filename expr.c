@@ -3,9 +3,11 @@
 extern char* absolute_start;
 
 Expr zero_expr() {
+    ExprVal ev;
+    ev.val = 0;
     Expr e = {
         EMPTY_EXPR,
-        { 0 }
+        ev
     };
     return e;
 }
@@ -28,6 +30,16 @@ void assign_r_to_BinExpr(BinExpr* be, Expr nd){
     *(be->r) = nd;
 }
 
+void parse_expr_list(Scope* p, TokenList* tk, ExprList* list) {
+    while (next_token(tk).type != TK_RPAREN) {
+        Expr nd = parse_expr(p, tk);
+        append_expr(list, nd);
+        if (next_token(tk).type == TK_COMMA) {
+            consume_token(tk);
+        }
+    }
+}
+
 Expr parse_function_call(Scope* p, TokenList* tk) {
     Token var = eat_token(tk, TK_IDENT);
     ExprVal nv;
@@ -38,8 +50,8 @@ Expr parse_function_call(Scope* p, TokenList* tk) {
     vec_init(&nv.function_call.args);
 
     eat_token(tk, TK_LPAREN);
-    
-    parse_arg_list(p, tk, &nv.function_call.args);
+
+    parse_expr_list(p, tk, &nv.function_call.args);
 
     eat_token(tk, TK_RPAREN);
 

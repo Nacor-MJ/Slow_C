@@ -35,8 +35,9 @@ void free_statement_children(Statement* st) {
         free_stmt_list(st->val.block);
     } else if (st->var == STMT_FUNCTION_DEFINITION) {
         FunctionDefinition* fd = &st->val.function_definition;
-        free(fd->signature.name);
+        free(fd->name);
         free_stmt_list(fd->body);
+        free_stmt_list(fd->args);
     } else if (st->var == STMT_CONDITIONAL_JUMP) {
         Conditional_jump* cj = &st->val.conditional_jump;
         free_expr_children(cj->condition);
