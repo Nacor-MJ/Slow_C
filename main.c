@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     Program program = parse(tokens);
 
     printf("\033[94mParsed Expr:\033[0m\n");
-    print_program(&program, 0);
+    // print_program(&program, 0);
 
     // ------------ Semantic Checks -------------
 

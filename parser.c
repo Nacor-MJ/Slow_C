@@ -4,12 +4,12 @@
 #include "slow_c.h"
 
 void free_statement_children(Statement* st);
-void free_expr_and_children(Expr* nd);
+void free_expr_children(Expr* nd);
 
 void free_expr_list(ExprList list) {
     int i; Expr nd;
     vec_foreach(&list, nd, i) {
-        free_expr_and_children(&nd);
+        free_expr_children(&nd);
     }
     vec_deinit(&list);
 }
@@ -27,11 +27,11 @@ void free_statement_children(Statement* st) {
         st->var == STMT_THROWAWAY ||
         st->var == STMT_RETURN
     ) {
-        free_expr_and_children(&st->val.throw_away);
+        free_expr_children(&st->val.throw_away);
     } else if (st->var == STMT_VARIABLE_ASSIGNMENT) {
         VariableAssignment* va = &st->val.variable_assignment;
         free(va->name);
-        free_expr_and_children(&va->val);
+        free_expr_children(&va->val);
     } else if (st->var == STMT_PROGRAM || st->var == STMT_BLOCK) {
         free_stmt_list(st->val.block);
     } else if (st->var == STMT_FUNCTION_DEFINITION) {
@@ -40,36 +40,36 @@ void free_statement_children(Statement* st) {
         free_stmt_list(fd->body);
     } else if (st->var == STMT_CONDITIONAL_JUMP) {
         Conditional_jump* cj = &st->val.conditional_jump;
-        free_expr_and_children(cj->condition);
-        free_expr_and_children(cj->true_block);
-        free_expr_and_children(cj->false_block);
+        free_expr_children(cj->condition);
+        free_expr_children(cj->true_block);
+        free_expr_children(cj->false_block);
     } else {
         printf("Not all statement types are freed %d\n", st->var);
         my_exit(-1);
     }
 }
 
-void free_expr_and_children(Expr* nd){
+void free_expr_children(Expr* nd){
     if (nd == NULL) {
         printf("Tried to free a null expr\n");
         my_exit(-1);
     }
 
     ExprVar var = nd->var;
-    printf("freeing expr %d\n", nd->var);
     if (var == BIN_EXPR) {
         BinExpr* be = nd->val.bin_expr;
         if (be->l != NULL) {
-            free_expr_and_children(be->l);
+            free_expr_children(be->l);
+            free(be->l);
         }
         if (be->r != NULL) {
-            free_expr_and_children(be->r);
+            free_expr_children(be->r);
+            free(be->r);
         }
         free(be); // This is good <3
     } else if (var == VARIABLE_IDENT) {
         free(nd->val.variable_ident);
     } else if (var == VAL ) {
-        printf("fake free for var\n");
         // pas
     } else if (var == FUNCTION_CALL) {
         FunctionCall fc = nd->val.function_call;
