@@ -121,10 +121,27 @@ void print_expr(Expr *node, int indent) {
     }
 }
 
-void print_vars(Parser* p) {
+void print_type_keyword(Type type) {
+    switch (type) {
+        case VOID:
+            printf("void");
+            break;
+        case INT:
+            printf("int");
+            break;
+        case NONE_TYPE:
+            printf("TYPE");
+            break;
+        default:
+            printf("Unknown type: %d", type);
+    }
+}
+
+void print_vars(Scope* p) {
     int i; char* name;
     vec_foreach(&p->variables.names, name, i) {
-        printf("%d $%s\n", p->variables.types.data[i], name);
+        print_type_keyword(p->variables.types.data[i]);
+        printf(" $%s\n", name);
     }
 }
 
@@ -185,19 +202,7 @@ void print_token(Token* t){
             printf(";");
             break;
         case TK_TYPE_KEYWORD:
-            switch (t->data.type) {
-                case VOID:
-                    printf("void");
-                    break;
-                case INT:
-                    printf("int");
-                    break;
-                case NONE_TYPE:
-                    printf("TYPE");
-                    break;
-                default:
-                    printf("Unknown type keyword: %d", t->data.type);
-            }
+            print_type_keyword(t->data.type);
             break;
         case TK_ASSIGN:
             printf("=");

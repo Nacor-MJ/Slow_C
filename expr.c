@@ -1,5 +1,7 @@
 #include "slow_c.h"
 
+extern char* absolute_start;
+
 Expr zero_expr() {
     return (Expr) {
         VAL,
@@ -25,7 +27,7 @@ void assign_r_to_BinExpr(BinExpr* be, Expr nd){
     *(be->r) = nd;
 }
 
-Expr parse_factor(Parser* p, TokenList* tk){
+Expr parse_factor(Scope* p, TokenList* tk){
     Token next = next_token(tk);
 
     if (next.type == TK_MINUS){
@@ -69,12 +71,12 @@ Expr parse_factor(Parser* p, TokenList* tk){
 
     } else {
         printf("Expected factor, got ");
-        print_error_tok(&next, p->absolute_start);
+        print_error_tok(&next, absolute_start);
         my_exit(-1);
     }
 }
 
-Expr parse_term(Parser* p, TokenList* tk){
+Expr parse_term(Scope* p, TokenList* tk){
     Expr factor = parse_factor(p, tk);
 
     if (next_token(tk).type == TK_TIMES || next_token(tk).type == TK_DIV){
@@ -118,7 +120,7 @@ Expr parse_term(Parser* p, TokenList* tk){
 
 }
 
-Expr parse_bin_expr(Parser* p, TokenList* tk){
+Expr parse_bin_expr(Scope* p, TokenList* tk){
     Expr term = parse_term(p, tk);
 
     if (next_token(tk).type == TK_PLUS || next_token(tk).type == TK_MINUS){
@@ -160,9 +162,8 @@ Expr parse_bin_expr(Parser* p, TokenList* tk){
     }
 }
 
-
 // <, >, <=, >=
-Expr parse_relational_expr(Parser* p, TokenList* tk){
+Expr parse_relational_expr(Scope* p, TokenList* tk){
     Expr bin_expr = parse_bin_expr(p, tk);
 
     if (
@@ -217,7 +218,7 @@ Expr parse_relational_expr(Parser* p, TokenList* tk){
 }
 
 // == !=
-Expr parse_eq_ne(Parser* p, TokenList* tk){
+Expr parse_eq_ne(Scope* p, TokenList* tk){
     Expr bin_expr = parse_relational_expr(p, tk);
 
     if (
@@ -263,7 +264,7 @@ Expr parse_eq_ne(Parser* p, TokenList* tk){
     }
 }
 
-Expr parse_function_call(Parser* p, TokenList* tk) {
+Expr parse_function_call(Scope* p, TokenList* tk) {
     Token var = eat_token(tk, TK_IDENT);
     ExprVal nv;
 
@@ -285,7 +286,7 @@ Expr parse_function_call(Parser* p, TokenList* tk) {
     return nd;
 }
 
-Expr parse_expr(Parser* p, TokenList* tk){
+Expr parse_expr(Scope* p, TokenList* tk){
     return parse_eq_ne(p, tk);
 }
 

@@ -7,10 +7,13 @@
 #include <stdbool.h>
 #include "vec.h"
 
-#define my_exit(i) \
+// this is the best function I have here
+static void inline __attribute__((noreturn)) fuck(int i, const char* a, int b) {
     printf("\033[31mError %d in %s:%d\033[0m\n", i, __FILE__, __LINE__); \
     *(int*)0 = 0;\
     exit(0);
+};
+#define my_exit(i) fuck(i, __FILE__, __LINE__);
 
 typedef struct Expr Expr;
 typedef struct Statement Statement;
@@ -261,32 +264,43 @@ Program parse(TokenList src);
 
 typedef vec_t(char*) VariablesNames;
 typedef vec_t(Type) VariablesTypes;
+typedef vec_t(int) VariablesVersions;
 // Oh yes a hashmap
 typedef struct {
     VariablesNames names;
     VariablesTypes types;
+    VariablesVersions versions;
 } Variables;
-typedef struct Parser {
+
+typedef struct Scope Scope;
+typedef struct Scope {
     Variables variables;
+    Scope* parent;
+} Scope;
+Scope* new_scope(Scope* parent);
+void deinit_scope();
+
+typedef struct Parser {
+    Scope* global_scope;
     char* absolute_start;
 } Parser;
 
 Program parse_program(Parser*, TokenList*);
-StmtList parse_block(Parser* p, TokenList* tk);
-Statement parse_statement(Parser* p, TokenList* tk);
+StmtList parse_block(Scope* p, TokenList* tk);
+Statement parse_statement(Scope* p, TokenList* tk);
 
-Statement parse_function_definition(Parser* p, TokenList* tk);
+Statement parse_function_definition(Scope* p, TokenList* tk);
 
-Type get_var_type(Parser* p, Token var);
-void parse_arg_list(Parser*p, TokenList* tk, ExprList* list);
+Type get_var_type(Scope* p, Token var);
+void parse_arg_list(Scope*p, TokenList* tk, ExprList* list);
 
 //
 // expr.c
 //
 
 Expr zero_expr();
-Expr parse_function_call(Parser* p, TokenList* tk);
-Expr parse_expr(Parser*, TokenList*);
+Expr parse_function_call(Scope* p, TokenList* tk);
+Expr parse_expr(Scope*, TokenList*);
 
 
 //
@@ -300,7 +314,7 @@ void semantic_check(Program* root);
 //
 
 const char* type_to_string(Type);
-void print_vars(Parser* p);
+void print_vars(Scope* p);
 
 // 
 // free.c

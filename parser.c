@@ -3,12 +3,14 @@
 
 #include "slow_c.h"
 
-void add_variable(Parser* p, Token var, Type type){
+char* absolute_start;
+
+void add_variable(Scope* p, Token var, Type type){
     int idx;
     vec_find(&p->variables.names, var.data.ident, idx);
     if (idx != -1) {
         printf("Variable '%s' already exists\n", var.data.ident);
-        print_error_tok(&var, p->absolute_start);
+        print_error_tok(&var, absolute_start);
         my_exit(-1);
     }
 
@@ -16,17 +18,36 @@ void add_variable(Parser* p, Token var, Type type){
     #pragma GCC diagnostic ignored "-Wunused-value"
     vec_push(&p->variables.names, var.data.ident);
     vec_push(&p->variables.types, type);
+    vec_push(&p->variables.versions, 0);
     #pragma GCC diagnostic pop
 }
-Type get_var_type(Parser* p, Token var){
+// returns the new var version
+int increase_var_version(Scope* p, Token var){
+    int idx;
+    vec_find(&p->variables.names, var.data.ident, idx);
+    if (idx == -1) {
+        if (p->parent != NULL) {
+            return increase_var_version(p->parent, var);
+        } else {
+            printf("Var '%s' doesn't exist\n", var.data.ident);
+            print_error_tok(&var, absolute_start);
+            my_exit(-1);
+        }
+    }
+    p->variables.versions.data[idx]++;
+    return p->variables.versions.data[idx];
+}
+Type get_var_type(Scope* p, Token var){
     int idx;
     vec_find_custom_comp_func(&p->variables.names, var.data.ident, idx, strcmp);
     if (idx == -1) {
-        printf("Variables: \n");
-        print_vars(p);
-        printf("Variable '%s' doesn't exist\n", var.data.ident);
-        print_error_tok(&var, p->absolute_start);
-        my_exit(-1);
+        if (p->parent != NULL) {
+            return get_var_type(p->parent, var);
+        } else {
+            printf("Var '%s' doesn't exist\n", var.data.ident);
+            print_error_tok(&var, absolute_start);
+            my_exit(-1);
+        }
     }
     return p->variables.types.data[idx];
 }
@@ -37,7 +58,7 @@ void append_expr(ExprList* list, Expr nd) {
     #pragma GCC diagnostic pop
 }
 
-void parse_arg_list(Parser*p, TokenList* tk, ExprList* list) {
+void parse_arg_list(Scope*p, TokenList* tk, ExprList* list) {
     while (next_token(tk).type != TK_RPAREN) {
         Expr nd = parse_expr(p, tk);
         if (next_token(tk).type != TK_RPAREN) eat_token(tk, TK_COMMA);
@@ -45,7 +66,7 @@ void parse_arg_list(Parser*p, TokenList* tk, ExprList* list) {
     }
 }
 
-Statement parse_var_declaration(Parser* p, TokenList* tk) {
+Statement parse_var_declaration(Scope* p, TokenList* tk) {
     Token type_tk = eat_token(tk, TK_TYPE_KEYWORD);
     Token name = consume_token(tk);
     VariableAssignment va = {
@@ -62,6 +83,8 @@ Statement parse_var_declaration(Parser* p, TokenList* tk) {
     } else {
         eat_token(tk, TK_SEMICOLON);
     }
+
+    add_variable(p, name, type_tk.data.type);
     StmtVal sv = { va };
     return (Statement) {
         STMT_VARIABLE_ASSIGNMENT,
@@ -69,7 +92,7 @@ Statement parse_var_declaration(Parser* p, TokenList* tk) {
     };
 }
 
-Statement parse_var_redeclaration(Parser* p, TokenList* tk) {
+Statement parse_var_redeclaration(Scope* p, TokenList* tk) {
     Token name = consume_token(tk);
 
     eat_token(tk, TK_ASSIGN);
@@ -79,7 +102,7 @@ Statement parse_var_redeclaration(Parser* p, TokenList* tk) {
         get_var_type(p, name),
         name.data.ident,
         expr,
-        1 // TODO get the actual version
+        increase_var_version(p, name)
     };
 
     StmtVal sv = { va };
@@ -89,7 +112,7 @@ Statement parse_var_redeclaration(Parser* p, TokenList* tk) {
     };
 }
 
-Statement parse_statement(Parser* p, TokenList* tk) {
+Statement parse_statement(Scope* p, TokenList* tk) {
     while (
         next_token(tk).type == TK_COMMENT ||
         next_token(tk).type == TK_SEMICOLON
@@ -107,7 +130,7 @@ Statement parse_statement(Parser* p, TokenList* tk) {
             return parse_function_definition(p, tk);
         } else {
             printf("Expected definiton got ");
-            print_error_tok(&next, p->absolute_start);
+            print_error_tok(&next, absolute_start);
             my_exit(-1);
         }
     // Variable redeclaration
@@ -126,7 +149,7 @@ Statement parse_statement(Parser* p, TokenList* tk) {
             return rst;
         } else {
             printf("Expected redeclaration or function call got ");
-            print_error_tok(&next, p->absolute_start);
+            print_error_tok(&next, absolute_start);
             my_exit(-1);
         }
     } else if (next.type == TK_RETURN) {
@@ -143,12 +166,12 @@ Statement parse_statement(Parser* p, TokenList* tk) {
         return rst;
     } else {
         printf("Expected statement got ");
-        print_error_tok(&next, p->absolute_start);
+        print_error_tok(&next, absolute_start);
         my_exit(-1);
     }
 }
 
-Statement parse_function_definition(Parser* p, TokenList* tk) {
+Statement parse_function_definition(Scope* p, TokenList* tk) {
     Token type_tk = eat_token(tk, TK_TYPE_KEYWORD);
     Token name = consume_token(tk);
     add_variable(p, name, type_tk.data.type);
@@ -186,13 +209,15 @@ Statement parse_function_definition(Parser* p, TokenList* tk) {
     return fn;
 }
 
-StmtList parse_block(Parser* p, TokenList* tk) {
+StmtList parse_block(Scope* p, TokenList* tk) {
     StmtList result;
     vec_init(&result);
 
+    Scope* scope = new_scope(p);
+
     Statement next;
     while (next_token(tk).type != TK_RCURLY) {
-        next = parse_statement(p, tk);
+        next = parse_statement(scope, tk);
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wunused-value"
         vec_push(&result, next);
@@ -207,7 +232,9 @@ Program parse_program(Parser* p, TokenList* tk) {
 
     Statement next;
     while (next_token(tk).type != TK_EOF) {
-        next = parse_statement(p, tk);
+        next = parse_statement(p->global_scope, tk);
+
+        // TODO check that there are no function calls or redeclarations in the global scope
 
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wunused-value"
@@ -223,10 +250,31 @@ Program parse_from_tok(Parser* p, TokenList tk){
     return program;
 }
 
+Scope* new_scope(Scope* parent) {
+    Scope* result = (Scope*) malloc(sizeof(Scope));
+    if (result == NULL) my_exit(69);
+
+    Variables vars;
+    vec_init(&vars.names);
+    vec_init(&vars.types);
+    vec_init(&vars.versions);
+
+    *result = (Scope) {
+        vars,
+        parent
+    };
+    return result;
+}
+void deinit_scope(Scope* s) {
+    vec_deinit(&s->variables.names);
+    vec_deinit(&s->variables.types);
+    vec_deinit(&s->variables.versions);
+    free(s);
+}
+
 Program parse(TokenList src){
     Parser p;
-    vec_init(&p.variables.names);
-    vec_init(&p.variables.types);
+    p.global_scope = new_scope(NULL);
 
     TokenData td;
     td.ident = "print";
@@ -235,17 +283,15 @@ Program parse(TokenList src){
         td,
         NULL,
     };
-    add_variable(&p, print_tk, VOID);
+    add_variable(p.global_scope, print_tk, VOID);
 
     src.pars_ptr = 0;
 
-    p.absolute_start = next_token_ptr(&src)->start_of_token;
+    absolute_start = next_token_ptr(&src)->start_of_token;
 
     Program result = parse_from_tok(&p, src);
 
-    vec_deinit(&p.variables.types);
-    vec_deinit(&p.variables.names);
-
+    deinit_scope(p.global_scope);
     return result;
 }
 
