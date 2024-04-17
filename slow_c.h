@@ -9,7 +9,7 @@
 
 // this is the best function I have here
 static void inline __attribute__((noreturn)) fuck(int i, const char* a, int b) {
-    printf("\033[31mError %d in %s:%d\033[0m\n", i, __FILE__, __LINE__); \
+    printf("\033[31mError %d in %s:%d\033[0m\n", i, a, b); \
     *(int*)0 = 0;\
     exit(0);
 };
@@ -73,7 +73,6 @@ typedef struct {
     int pars_ptr;
 } TokenList;
 
-void print_token(Token*);
 void print_error_tok(Token*, char*);
 Token eat_token(TokenList* tk, TokenType check);
 Token consume_token(TokenList* tk);
@@ -197,18 +196,23 @@ typedef struct {
     char* name;
     ExprList args;
 } FunctionCall;
+typedef struct {
+    char* name;
+    int version;
+} VariableIdent;
 
 typedef union {
-    char* variable_ident;
-    FunctionCall function_call;
     int val;
+    VariableIdent variable_ident;
+    FunctionCall function_call;
     BinExpr* bin_expr;
 } ExprVal;
 typedef enum {
+    EMPTY_EXPR,
+    VAL,
     VARIABLE_IDENT,
     FUNCTION_CALL,
-    VAL,
-    BIN_EXPR,
+    BIN_EXPR
 } ExprVar;
 typedef struct Expr {
     ExprVar var;
@@ -256,9 +260,6 @@ typedef struct Statement {
     StmtVal val;
 } Statement;
 
-void print_program(Program*, int);
-void print_statement(Statement*, int);
-void print_expr(Expr*, int);
 void free_stmt_list(StmtList);
 Program parse(TokenList src);
 
@@ -291,8 +292,19 @@ Statement parse_statement(Scope* p, TokenList* tk);
 
 Statement parse_function_definition(Scope* p, TokenList* tk);
 
-Type get_var_type(Scope* p, Token var);
 void parse_arg_list(Scope*p, TokenList* tk, ExprList* list);
+
+//
+// scope.c
+//
+
+void add_variable(Scope* p, Token var, Type type);
+int increase_var_version(Scope* p, Token var);
+Type get_var_type(Scope* p, Token var);
+int get_var_version(Scope* p, Token var);
+
+Scope* new_scope(Scope* parent);
+void deinit_scope(Scope* s);
 
 //
 // expr.c
@@ -304,10 +316,10 @@ Expr parse_expr(Scope*, TokenList*);
 
 
 //
-// semantic_check.c
+// post_processing.c
 //
 
-void semantic_check(Program* root);
+void post_processing(Program* root);
 
 //
 // print.c
@@ -315,6 +327,11 @@ void semantic_check(Program* root);
 
 const char* type_to_string(Type);
 void print_vars(Scope* p);
+void print_token(Token*);
+void print_type_keyword(Type);
+void print_program(Program*, int);
+void print_statement(Statement*, int);
+void print_expr(Expr*, int);
 
 // 
 // free.c

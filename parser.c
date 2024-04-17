@@ -4,53 +4,6 @@
 #include "slow_c.h"
 
 char* absolute_start;
-
-void add_variable(Scope* p, Token var, Type type){
-    int idx;
-    vec_find(&p->variables.names, var.data.ident, idx);
-    if (idx != -1) {
-        printf("Variable '%s' already exists\n", var.data.ident);
-        print_error_tok(&var, absolute_start);
-        my_exit(-1);
-    }
-
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wunused-value"
-    vec_push(&p->variables.names, var.data.ident);
-    vec_push(&p->variables.types, type);
-    vec_push(&p->variables.versions, 0);
-    #pragma GCC diagnostic pop
-}
-// returns the new var version
-int increase_var_version(Scope* p, Token var){
-    int idx;
-    vec_find(&p->variables.names, var.data.ident, idx);
-    if (idx == -1) {
-        if (p->parent != NULL) {
-            return increase_var_version(p->parent, var);
-        } else {
-            printf("Var '%s' doesn't exist\n", var.data.ident);
-            print_error_tok(&var, absolute_start);
-            my_exit(-1);
-        }
-    }
-    p->variables.versions.data[idx]++;
-    return p->variables.versions.data[idx];
-}
-Type get_var_type(Scope* p, Token var){
-    int idx;
-    vec_find_custom_comp_func(&p->variables.names, var.data.ident, idx, strcmp);
-    if (idx == -1) {
-        if (p->parent != NULL) {
-            return get_var_type(p->parent, var);
-        } else {
-            printf("Var '%s' doesn't exist\n", var.data.ident);
-            print_error_tok(&var, absolute_start);
-            my_exit(-1);
-        }
-    }
-    return p->variables.types.data[idx];
-}
 void append_expr(ExprList* list, Expr nd) {
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-value"
@@ -148,6 +101,7 @@ Statement parse_statement(Scope* p, TokenList* tk) {
             eat_token(tk, TK_SEMICOLON);
             return rst;
         } else {
+            get_var_version(p, next);
             printf("Expected redeclaration or function call got ");
             print_error_tok(&next, absolute_start);
             my_exit(-1);
@@ -159,7 +113,7 @@ Statement parse_statement(Scope* p, TokenList* tk) {
         sv.return_ = parse_expr(p, tk);
 
         Statement rst = {
-            STMT_THROWAWAY,
+            STMT_RETURN,
             sv
         };
         eat_token(tk, TK_SEMICOLON);
@@ -232,6 +186,12 @@ Program parse_program(Parser* p, TokenList* tk) {
 
     Statement next;
     while (next_token(tk).type != TK_EOF) {
+        if ( next_token(tk).type != TK_COMMENT &&
+            next_token(tk).type != TK_SEMICOLON &&
+            next_token(tk).type != TK_TYPE_KEYWORD) {
+            printf("Only assignments allowed in the global scope\n");
+            print_error_tok(next_token_ptr(tk), absolute_start);
+        }
         next = parse_statement(p->global_scope, tk);
 
         // TODO check that there are no function calls or redeclarations in the global scope
@@ -242,34 +202,6 @@ Program parse_program(Parser* p, TokenList* tk) {
         #pragma GCC diagnostic pop
     }
     return result;
-}
-
-Program parse_from_tok(Parser* p, TokenList tk){
-    Program program = parse_program(p, &tk);
-
-    return program;
-}
-
-Scope* new_scope(Scope* parent) {
-    Scope* result = (Scope*) malloc(sizeof(Scope));
-    if (result == NULL) my_exit(69);
-
-    Variables vars;
-    vec_init(&vars.names);
-    vec_init(&vars.types);
-    vec_init(&vars.versions);
-
-    *result = (Scope) {
-        vars,
-        parent
-    };
-    return result;
-}
-void deinit_scope(Scope* s) {
-    vec_deinit(&s->variables.names);
-    vec_deinit(&s->variables.types);
-    vec_deinit(&s->variables.versions);
-    free(s);
 }
 
 Program parse(TokenList src){
@@ -289,7 +221,7 @@ Program parse(TokenList src){
 
     absolute_start = next_token_ptr(&src)->start_of_token;
 
-    Program result = parse_from_tok(&p, src);
+    Program result = parse_program(&p, &src);
 
     deinit_scope(p.global_scope);
     return result;

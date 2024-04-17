@@ -67,7 +67,7 @@ void free_expr_children(Expr* nd){
         }
         free(be); // This is good <3
     } else if (var == VARIABLE_IDENT) {
-        free(nd->val.variable_ident);
+        free(nd->val.variable_ident.name);
     } else if (var == VAL ) {
         // pas
     } else if (var == FUNCTION_CALL) {

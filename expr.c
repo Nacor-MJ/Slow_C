@@ -3,10 +3,11 @@
 extern char* absolute_start;
 
 Expr zero_expr() {
-    return (Expr) {
-        VAL,
+    Expr e = {
+        EMPTY_EXPR,
         { 0 }
     };
+    return e;
 }
 
 void assign_l_to_BinExpr(BinExpr* be, Expr nd){
@@ -25,6 +26,28 @@ void assign_r_to_BinExpr(BinExpr* be, Expr nd){
         my_exit(-1);
     };
     *(be->r) = nd;
+}
+
+Expr parse_function_call(Scope* p, TokenList* tk) {
+    Token var = eat_token(tk, TK_IDENT);
+    ExprVal nv;
+
+    nv.function_call.name = var.data.ident;
+    nv.function_call.type = get_var_type(p, var);
+
+    vec_init(&nv.function_call.args);
+
+    eat_token(tk, TK_LPAREN);
+    
+    parse_arg_list(p, tk, &nv.function_call.args);
+
+    eat_token(tk, TK_RPAREN);
+
+    Expr nd = {
+        FUNCTION_CALL,
+        nv
+    };
+    return nd;
 }
 
 Expr parse_factor(Scope* p, TokenList* tk){
@@ -62,7 +85,8 @@ Expr parse_factor(Scope* p, TokenList* tk){
         Token name = consume_token(tk);
         
         ExprVal ndata;
-        ndata.variable_ident = name.data.ident;
+        ndata.variable_ident.name = name.data.ident;
+        ndata.variable_ident.version = get_var_version(p, name);
         Expr nd = {
             VARIABLE_IDENT,
             ndata
@@ -264,29 +288,8 @@ Expr parse_eq_ne(Scope* p, TokenList* tk){
     }
 }
 
-Expr parse_function_call(Scope* p, TokenList* tk) {
-    Token var = eat_token(tk, TK_IDENT);
-    ExprVal nv;
-
-    nv.function_call.name = var.data.ident;
-    nv.function_call.type = get_var_type(p, var);
-
-    vec_init(&nv.function_call.args);
-
-    eat_token(tk, TK_LPAREN);
-    
-    parse_arg_list(p, tk, &nv.function_call.args);
-
-    eat_token(tk, TK_RPAREN);
-
-    Expr nd = {
-        FUNCTION_CALL,
-        nv
-    };
-    return nd;
-}
-
 Expr parse_expr(Scope* p, TokenList* tk){
-    return parse_eq_ne(p, tk);
+    Expr e = parse_eq_ne(p, tk);
+    return e;
 }
 

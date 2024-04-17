@@ -15,11 +15,10 @@ gdb: Slow_C
 	gdb ./Slow_C.exe
 
 test_idk: Slow_C
-	./Slow_C.exe idk.txt 
+	./Slow_C.exe idk.c 
 	-./idk.exe
 
 git:
-	Set-ExecutionPolicy AllSigned
 	./git.ps1
 
 

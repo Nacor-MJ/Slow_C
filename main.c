@@ -60,26 +60,19 @@ int main(int argc, char *argv[]) {
     // printTokens(tokens);
 
     // ------------ Parse --------------
+    printf("\033[94mParsed Program:\033[0m\n");
     Program program = parse(tokens);
-
-    printf("\033[94mParsed Expr:\033[0m\n");
-    print_program(&program, 0);
+    // print_program(&program, 0);
 
     // ------------ Semantic Checks -------------
 
     printf("\033[94mSemantic Checks:\033[0m\n");
-    semantic_check(&program);
+    post_processing(&program);
 
     // ----------- Generate IR ------------
 
     printf("\033[94mGenerating IR:\033[0m\n");
-    char file_name_buff[64] = "";
-    strncpy(file_name_buff, file_path, 60);
-    strcat(file_name_buff, ".f90");
-
-    FILE* ir = fopen(file_name_buff, "w");
-    // generate_ir(ir, &program);
-    fclose(ir);
+    // generate_asm(ir, &program);
 
     printf("\033[94mCompiling:\033[0m\n");
 
