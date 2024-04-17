@@ -302,4 +302,10 @@ void semantic_check(Program* root);
 const char* type_to_string(Type);
 void print_vars(Parser* p);
 
+// 
+// free.c
+//
+
+void free_program(Program);
+
 #endif

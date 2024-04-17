@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
 
     // ---------- Cleanup ----------
     vec_deinit(&tokens);
-    free_stmt_list((StmtList) program);
+    free_program(program);
     free(buff);
 	return 0;
 }
