@@ -35,7 +35,6 @@
   ( vec_expand_(vec_unpack_(v)) ? -1 :\
     ((v)->data[(v)->length++] = (val), 0), 0 )
 
-
 #define vec_pop(v)\
   (v)->data[--(v)->length]
 
@@ -112,7 +111,7 @@
 #define vec_find_custom_comp_func(v, val, idx, comp)\
   do {\
     for ((idx) = 0; (idx) < (v)->length; (idx)++) {\
-      if (comp((v)->data[(idx)] ,(val)) == 0) break;\
+      if (comp((v)->data[(idx)], (val)) == 0) break;\
     }\
     if ((idx) == (v)->length) (idx) = -1;\
   } while (0)

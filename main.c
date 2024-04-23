@@ -72,14 +72,18 @@ int main(int argc, char *argv[]) {
     // ----------- Generate IR ------------
 
     printf("\033[94mGenerating IR:\033[0m\n");
-    // generate_asm(ir, &program);
+    FILE* f = fopen("tmp.S", "w");
+    generate_asm(f, &program);
 
     printf("\033[94mCompiling:\033[0m\n");
+    system("gcc tmp.S -o idk.exe");
 
+    fclose(f);
     // ---------- Convert to ASM ----------
+    
 
     // ---------- Cleanup ----------
-    vec_deinit(&tokens);
+    free_token_list_and_data(&tokens);
     free_program(program);
     free(buff);
 	return 0;

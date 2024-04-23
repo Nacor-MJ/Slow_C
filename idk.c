@@ -1,12 +1,14 @@
 int fuck(int b) {
-    int a = -5 + 20 * 14;
+    int a;
+    a = -6 / 2 + 20 * 14;
     b = b * 2;
     a = a + b;
     return a;
 }
 
 int main() {
-    int a = fuck();
+    int a = 5;
     int b = 3;
-    print(a, b);
+    print(a);
+    print(b);
 }

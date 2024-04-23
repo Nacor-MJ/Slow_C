@@ -74,11 +74,10 @@ typedef struct {
 } TokenList;
 
 void print_error_tok(Token*, char*);
-Token eat_token(TokenList* tk, TokenType check);
-Token consume_token(TokenList* tk);
-Token next_token(TokenList* tk);
-Token* next_token_ptr(TokenList* tk);
-Token next_token_with_offset(TokenList* tk, int offset);
+Token* eat_token(TokenList* tk, TokenType check);
+Token* consume_token(TokenList* tk);
+Token* next_token(TokenList* tk);
+Token* next_token_with_offset(TokenList* tk, int offset);
 void printTokens(TokenList* t);
 bool compare_tokens(Token a, Token b);
 void tokenize(TokenList* tk, char* src);
@@ -199,6 +198,7 @@ typedef struct {
 typedef struct {
     char* name;
     int version;
+    int ref_count;
 } VariableIdent;
 
 typedef union {
@@ -222,6 +222,7 @@ typedef struct Variable {
 typedef struct Expr {
     ExprVar var;
     ExprVal val;
+    Token* start;
 } Expr;
 
 
@@ -233,9 +234,8 @@ typedef struct {
 } FunctionDefinition;
 typedef struct {
     Type type;
-    char* name;
     Expr val;
-    int version;
+    VariableIdent vi;
 } VariableAssignment;
 typedef struct Conditional_jump {
     Expr* condition;
@@ -265,6 +265,7 @@ typedef enum StmtVar {
 typedef struct Statement {
     StmtVar var;
     StmtVal val;
+    Token* start;
 } Statement;
 
 void free_stmt_list(StmtList);
@@ -303,11 +304,13 @@ void parse_arg_list(Scope*p, TokenList* tk, StmtList* list);
 void append_statement(StmtList* list, Statement nd);
 void append_expr(ExprList* list, Expr nd);
 
+void flatten_statement(StmtList* list, Statement stmt, Scope* p);
+
 //
 // scope.c
 //
 
-void add_variable(Scope* p, Token var, Type type);
+void add_variable(Scope* p, Token var, Type type, int version);
 int increase_var_version(Scope* p, Token var);
 Type get_var_type(Scope* p, Token var);
 int get_var_version(Scope* p, Token var);
@@ -322,6 +325,7 @@ void deinit_scope(Scope* s);
 Expr zero_expr();
 Expr parse_function_call(Scope* p, TokenList* tk);
 Expr parse_expr(Scope*, TokenList*);
+Type get_expr_type(Expr*);
 
 
 //
@@ -347,5 +351,12 @@ void print_expr(Expr*, int);
 //
 
 void free_program(Program);
+void free_token_list_and_data(TokenList* list);
+
+//
+// assembly.c
+//
+
+void generate_asm(FILE* f, Program* root);
 
 #endif

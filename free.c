@@ -1,5 +1,13 @@
 #include "slow_c.h"
 
+void free_token_list_and_data(TokenList* list) {
+    int i; Token tk;
+    vec_foreach(list, tk, i) {
+        if (tk.type == TK_IDENT) free(tk.data.ident);
+    }
+    vec_deinit(list);
+}
+
 void free_expr_list(ExprList);
 void free_stmt_list(StmtList);
 void free_expr_children(Expr*);
@@ -29,13 +37,11 @@ void free_statement_children(Statement* st) {
         free_expr_children(&st->val.throw_away);
     } else if (st->var == STMT_VARIABLE_ASSIGNMENT) {
         VariableAssignment* va = &st->val.variable_assignment;
-        free(va->name);
         free_expr_children(&va->val);
     } else if (st->var == STMT_PROGRAM || st->var == STMT_BLOCK) {
         free_stmt_list(st->val.block);
     } else if (st->var == STMT_FUNCTION_DEFINITION) {
         FunctionDefinition* fd = &st->val.function_definition;
-        free(fd->name);
         free_stmt_list(fd->body);
         free_stmt_list(fd->args);
     } else if (st->var == STMT_CONDITIONAL_JUMP) {
@@ -68,13 +74,14 @@ void free_expr_children(Expr* nd){
         }
         free(be); // This is good <3
     } else if (var == VARIABLE_IDENT) {
-        free(nd->val.variable_ident.name);
+        // pass
     } else if (var == VAL ) {
         // pas
     } else if (var == FUNCTION_CALL) {
         FunctionCall fc = nd->val.function_call;
         free_expr_list(fc.args);
-        free(fc.name);
+    } else if (var == EMPTY_EXPR) {
+        // pass
     } else {
         printf("Not all expr types are freed %d\n", var);
         my_exit(-1);

@@ -72,7 +72,7 @@ void print_statement(Statement* stmt, int indent) {
     if (var == STMT_VARIABLE_ASSIGNMENT) {
         VariableAssignment va = stmt->val.variable_assignment;
         print_type_keyword(va.type);
-        printf(" %s%d", va.name, va.version);
+        printf(" %s%d", va.vi.name, va.vi.version);
         if (va.val.var != EMPTY_EXPR) {
             printf(" = ");
             print_expr(&va.val, indent);

@@ -55,38 +55,36 @@ void print_error_tok(Token* tk, char* absolute_start) {
 
 }
 
-Token consume_token(TokenList* tk){
-    Token a = tk->data[tk->pars_ptr];
+Token* consume_token(TokenList* tk){
+    Token* a = &tk->data[tk->pars_ptr];
     tk->pars_ptr += 1;
     return a;
 }
 
-Token eat_token(TokenList* tk, TokenType check){
-    Token next = consume_token(tk);
-    if (next.type != check){
+Token* eat_token(TokenList* tk, TokenType check){
+    Token* next = consume_token(tk);
+    if (next->type != check){
         printf("\033[91mERROR: expected ");
         Token check_tk = {check, {0}, NULL};
         print_token(&check_tk);
         printf(" got ");
-        print_error_tok(&next, global_start_of_file);
+        print_error_tok(next, global_start_of_file);
         printf("\033[0m");
         my_exit(-1);
     }
     return next;
 }
 
-Token next_token(TokenList* tk) {
-    return tk->data[tk->pars_ptr];
+Token* next_token(TokenList* tk) {
+    return &tk->data[tk->pars_ptr];
 }
-Token* next_token_ptr(TokenList* tk) {
-    return &(tk->data[tk->pars_ptr]);
-}
-Token next_token_with_offset(TokenList* tk, int offset) {
+
+Token* next_token_with_offset(TokenList* tk, int offset) {
     if (tk->pars_ptr + offset > tk->length) {
         printf("\033[91mERROR: out of bounds\033[0m");
         my_exit(-1);
     }
-    return tk->data[tk->pars_ptr + offset];
+    return &tk->data[tk->pars_ptr + offset];
 }
 
 void skip_whitespace(char** src) {
@@ -174,7 +172,23 @@ void tokenize(TokenList* tk, char* src) {
                 break;
             case '/':
                 src++;
-                tmp.type = TK_DIV;
+                if (*src == '/') {
+                    while (*src && *src != '\n'){
+                        src++;
+                        printf("%c", *src);
+                    }
+                    skip_whitespace(&src);
+                    continue;
+                } else if (*src == '*') {
+                    while (*src && (*src != '*' || *(src + 1) != '/')){
+                        src++;
+                    }
+                    src += 2;
+                    skip_whitespace(&src);
+                    continue;
+                } else {
+                    tmp.type = TK_DIV;
+                }
                 break;
             case '(':
                 src++;

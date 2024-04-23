@@ -6,13 +6,13 @@ OBJS=$(SRCS:.c=.o)
 # Stage 1
 
 Slow_C: $(OBJS)
-	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS) -g
 	rm *.o
 
 $(OBJS): slow_c.h vec.h
 
 gdb: Slow_C
-	gdb ./Slow_C.exe
+	gdb -ex run --args ./Slow_C.exe idk.c
 
 test_idk: Slow_C
 	./Slow_C.exe idk.c 
@@ -21,6 +21,12 @@ test_idk: Slow_C
 git:
 	./git.ps1
 
+valgrind: Slow_C
+	valgrind --leak-check=full \
+         --show-leak-kinds=all \
+         --track-origins=yes \
+         --verbose \
+         ./Slow_C idk.c
 
 # Misc.
 

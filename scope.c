@@ -2,10 +2,29 @@
 
 extern char* absolute_start;
 
-void add_variable(Scope* p, Token var, Type type){
+int idfk (const char *p1, const char *p2)
+{
+  const unsigned char *s1 = (const unsigned char *) p1;
+  const unsigned char *s2 = (const unsigned char *) p2;
+  unsigned char c1, c2;
+  do
+    {
+      c1 = (unsigned char) *s1++;
+      c2 = (unsigned char) *s2++;
+      if (c1 == '\0') return c1 - c2;
+    }
+  while (c1 == c2);
+  return c1 - c2;
+}
+
+void add_variable(Scope* p, Token var, Type type, int version) {
     int idx;
-    vec_find_custom_comp_func(&p->variables.names, var.data.ident, idx, strcmp);
+    vec_find_custom_comp_func(&p->variables.names, var.data.ident, idx, idfk);
     if (idx != -1) {
+        if ( strcmp(var.data.ident, "$throw" ) == 0 ||
+             strcmp(var.data.ident, "$return") == 0) {
+            return;
+        }
         printf("Variable '%s' already exists\n", var.data.ident);
         print_error_tok(&var, absolute_start);
         my_exit(-1);
@@ -13,9 +32,14 @@ void add_variable(Scope* p, Token var, Type type){
 
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-value"
-    vec_push(&p->variables.names, var.data.ident);
+
+    char* tmp = malloc(strlen(var.data.ident) + 1);
+    if (tmp == NULL) my_exit(69);
+    strcpy(tmp, var.data.ident);
+
+    vec_push(&p->variables.names, tmp);
     vec_push(&p->variables.types, type);
-    vec_push(&p->variables.versions, 0);
+    vec_push(&p->variables.versions, version);
     #pragma GCC diagnostic pop
 }
 // returns the new var version
@@ -35,8 +59,13 @@ int increase_var_version(Scope* p, Token var){
     return p->variables.versions.data[idx];
 }
 int get_var_version(Scope* p, Token var){
+    char* name = var.data.ident;
+    if (strcmp(name, "$throw") == 0 ||
+        strcmp(name, "$return") == 0) {
+        return 0;
+    }
     int idx;
-    vec_find_custom_comp_func(&p->variables.names, var.data.ident, idx, strcmp);
+    vec_find_custom_comp_func(&p->variables.names, name, idx, idfk);
     if (idx == -1) {
         if (p->parent != NULL) {
             return get_var_version(p->parent, var);
@@ -80,6 +109,10 @@ Scope* new_scope(Scope* parent) {
     return result;
 }
 void deinit_scope(Scope* s) {
+    int idx; char* name;
+    vec_foreach(&s->variables.names, name, idx) {
+        free(name);
+    }
     vec_deinit(&s->variables.names);
     vec_deinit(&s->variables.types);
     vec_deinit(&s->variables.versions);
