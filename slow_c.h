@@ -21,7 +21,8 @@ typedef struct Statement Statement;
 typedef enum Type {
     NONE_TYPE,
     VOID,
-    INT
+    INT,
+    FLOAT
 } Type;
 
 //
@@ -34,7 +35,8 @@ typedef enum {
     TK_MINUS,
     TK_TIMES,
     TK_DIV,
-    TK_NUM,
+    TK_INT,
+    TK_FLOAT,
     TK_IDENT,
     TK_LPAREN,
     TK_RPAREN,
@@ -55,7 +57,8 @@ typedef enum {
 } TokenType;
 typedef union {
     // If you add anything here implement compare_tokens for it
-    int num;
+    int integer;
+    float floating;
     char* ident;
     Type type;
 } TokenData;
@@ -202,7 +205,8 @@ typedef struct {
 } VariableIdent;
 
 typedef union {
-    int val;
+    int integer;
+    float floating;
     VariableIdent variable_ident;
     FunctionCall function_call;
     BinExpr* bin_expr;
@@ -214,15 +218,11 @@ typedef enum {
     FUNCTION_CALL,
     BIN_EXPR
 } ExprVar;
-typedef struct Variable {
-    char* name;
-    int version;
-    Type type;
-} Variable;
 typedef struct Expr {
     ExprVar var;
     ExprVal val;
     Token* start;
+    Type type;
 } Expr;
 
 
@@ -306,6 +306,8 @@ void append_expr(ExprList* list, Expr nd);
 
 void flatten_statement(StmtList* list, Statement stmt, Scope* p);
 
+void check_types(Type t1, Type t2, Token* tk);
+
 //
 // scope.c
 //
@@ -322,7 +324,7 @@ void deinit_scope(Scope* s);
 // expr.c
 //
 
-Expr zero_expr();
+Expr zero_expr(Token* );
 Expr parse_function_call(Scope* p, TokenList* tk);
 Expr parse_expr(Scope*, TokenList*);
 Type get_expr_type(Expr*);

@@ -4,11 +4,12 @@ extern char* absolute_start;
 
 Expr zero_expr(Token* start) {
     ExprVal ev;
-    ev.val = 0;
+    ev.integer = 0;
     Expr e = {
         EMPTY_EXPR,
         ev,
-        start
+        start,
+        NONE_TYPE
     };
     return e;
 }
@@ -40,7 +41,9 @@ Expr parse_function_call(Scope* p, TokenList* tk) {
     ExprVal nv;
 
     nv.function_call.name = var->data.ident;
-    nv.function_call.type = get_var_type(p, *var);
+
+    Type tp = get_var_type(p, *var);
+    nv.function_call.type = tp;
 
     vec_init(&nv.function_call.args);
 
@@ -53,7 +56,8 @@ Expr parse_function_call(Scope* p, TokenList* tk) {
     Expr nd = {
         FUNCTION_CALL,
         nv,
-        var
+        var,
+        tp
     };
     return nd;
 }
@@ -65,21 +69,33 @@ Expr parse_factor(Scope* p, TokenList* tk){
     if (next->type == TK_MINUS){
         consume_token(tk);
         Token* negated = next_token(tk);
-        negated->data.num *= -1;
+        negated->data.integer *= -1;
         next = next_token(tk);
     } else if (next->type == TK_PLUS){
         consume_token(tk);
         next = next_token(tk);
     }
 
-    if (next->type == TK_NUM){
-        eat_token(tk, TK_NUM);
+    if (next->type == TK_INT){
+        eat_token(tk, TK_INT);
         ExprVal nv;
-        nv.val = next->data.num;
+        nv.integer = next->data.integer;
         Expr nd = {
             VAL,
             nv,
-            start
+            start,
+            INT
+        };
+        return nd;
+    } else if (next->type == TK_FLOAT) {
+        eat_token(tk, TK_FLOAT);
+        ExprVal nv;
+        nv.floating = next->data.floating;
+        Expr nd = {
+            VAL,
+            nv,
+            start,
+            FLOAT
         };
         return nd;
     } else if (next->type == TK_LPAREN){
@@ -100,7 +116,8 @@ Expr parse_factor(Scope* p, TokenList* tk){
         Expr nd = {
             VARIABLE_IDENT,
             ndata,
-            start
+            start,
+            get_var_type(p, *name)
         };
         return nd;
 
@@ -146,7 +163,8 @@ Expr parse_term(Scope* p, TokenList* tk){
         Expr nd = {
             BIN_EXPR,
             nv,
-            factor.start
+            factor.start,
+            factor.type
         };
 
         return nd;
@@ -170,14 +188,18 @@ Expr parse_bin_expr(Scope* p, TokenList* tk){
         };
         assign_l_to_BinExpr(&result, term);
 
+        Token* error_tk = next_token(tk);
+
         switch (op->type){
             case (TK_MINUS):
                 result.op = OP_MINUS;
                 assign_r_to_BinExpr(&result, parse_term(p, tk));
+                check_types(term.type, result.r->type, error_tk);
                 break;
             case (TK_PLUS):
                 result.op = OP_PLUS;
                 assign_r_to_BinExpr(&result, parse_term(p, tk));
+                check_types(term.type, result.r->type, error_tk);
                 break;
             default:
                 printf("Expected Plus or Minus");
@@ -190,7 +212,8 @@ Expr parse_bin_expr(Scope* p, TokenList* tk){
         Expr nd = {
             BIN_EXPR,
             nv,
-            term.start
+            term.start,
+            term.type
         };
 
         return nd;
@@ -246,7 +269,8 @@ Expr parse_relational_expr(Scope* p, TokenList* tk){
         Expr nd = {
             BIN_EXPR,
             nv,
-            bin_expr.start
+            bin_expr.start,
+            bin_expr.type
         };
 
         return nd;
@@ -294,7 +318,8 @@ Expr parse_eq_ne(Scope* p, TokenList* tk){
         Expr nd = {
             BIN_EXPR,
             nv,
-            bin_expr.start
+            bin_expr.start,
+            bin_expr.type
         };
 
         return nd;

@@ -46,9 +46,9 @@ int main(int argc, char *argv[]) {
     printf("\033[94mCompiling %s\033[0m\n", file_path_with_extenstion);
     char* buff = load_file(file_path_with_extenstion);
 
-    char file_path[strlen(file_path_with_extenstion) - 4];
-    strncpy(file_path, file_path_with_extenstion, strlen(file_path_with_extenstion) - 4);
-    file_path[strlen(file_path_with_extenstion) - 4] = '\0';
+    char file_path[strlen(file_path_with_extenstion) - 2];
+    strncpy(file_path, file_path_with_extenstion, strlen(file_path_with_extenstion) - 2);
+    file_path[strlen(file_path_with_extenstion) - 2] = '\0';
 
     // ------------ Tokenize --------------
     TokenList tokens;
@@ -72,14 +72,19 @@ int main(int argc, char *argv[]) {
     // ----------- Generate IR ------------
 
     printf("\033[94mGenerating IR:\033[0m\n");
-    FILE* f = fopen("tmp.S", "w");
-    generate_asm(f, &program);
 
-    printf("\033[94mCompiling:\033[0m\n");
-    system("gcc tmp.S -o idk.exe");
+    FILE* f = fopen("tmp.s", "w");
+    generate_asm(f, &program);
 
     fclose(f);
     // ---------- Convert to ASM ----------
+    printf("\033[94mAssembling:\033[0m\n");
+
+    char* asm_file_command = (char*) malloc(sizeof(char) * 256);
+    sprintf(asm_file_command, "gcc tmp.s -o %s", file_path);
+    printf("%s\n", asm_file_command);
+    system(asm_file_command);
+    free(asm_file_command);
     
 
     // ---------- Cleanup ----------

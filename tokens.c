@@ -2,6 +2,7 @@
 #define TOKENS_C
 
 #include "slow_c.h"
+#include "math.h"
 
 char* global_start_of_file;
 
@@ -94,9 +95,21 @@ void skip_whitespace(char** src) {
 }
 void tokenize_num(Token* tk, char** src){
     int num = strtol(*src, src, 0);
-    
-    tk->type = TK_NUM;
-    tk->data.num = num;
+
+    if (**src == '.') {
+        (*src) += 1;
+        tk->type = TK_FLOAT;
+
+        float tmp = num;
+
+        float fraction = (float) strtol(*src, src, 0);
+        tmp += fraction / (float) pow(10, (int) strlen(*src));
+
+        tk->data.floating = tmp;
+    } else {
+        tk->type = TK_INT;
+        tk->data.integer = num;
+    }
 }
 void add_token(TokenList* tks, Token tk) {
     #pragma GCC diagnostic push
@@ -109,8 +122,12 @@ void add_token(TokenList* tks, Token tk) {
 bool compare_tokens(Token a, Token b) {
     if (a.type == b.type){
         switch (a.type){
-            case TK_NUM:
-                return a.data.num == b.data.num;
+            case TK_INT:
+                return a.data.integer == b.data.integer;
+            case TK_FLOAT:
+                return a.data.floating == b.data.floating;
+            case TK_TYPE_KEYWORD:
+                return a.data.type == b.data.type;
             case TK_IDENT:
                 return strcmp(a.data.ident, b.data.ident) == 0;
             default:
@@ -235,6 +252,10 @@ void tokenize(TokenList* tk, char* src) {
                     src += 3;
                     tmp.type = TK_TYPE_KEYWORD;
                     tmp.data.type = INT;
+                } else if (strncmp(src, "float", 5) == 0) {
+                    src += 5;
+                    tmp.type = TK_TYPE_KEYWORD;
+                    tmp.data.type = FLOAT;
                 } else {
                     char* buff;
                     int i = 0;

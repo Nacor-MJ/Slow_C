@@ -4,6 +4,23 @@
 #include "slow_c.h"
 
 char* absolute_start;
+
+void check_types(Type t1, Type t2, Token* tk) {
+    if (t1 != t2) {
+        printf("\033[31mType mismatch %s!=%s\033[0m", type_to_string(t1), type_to_string(t2));
+
+        TokenData tv;
+        tv.ident = "";
+        Token dbg_tk = {
+            TK_IDENT,
+            tv,
+            tk->start_of_token
+        };
+
+        print_error_tok(&dbg_tk, absolute_start);
+    }
+}
+
 void append_expr(ExprList* list, Expr nd) {
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-value"
@@ -26,7 +43,7 @@ void parse_arg_list(Scope*p, TokenList* tk, StmtList* list) {
         StmtVal sv;
         VariableAssignment va = {
             type_tk->data.type,
-            zero_expr(),
+            zero_expr(name),
             {
                 name->data.ident,
                 0
@@ -47,10 +64,11 @@ void parse_arg_list(Scope*p, TokenList* tk, StmtList* list) {
 
 Statement parse_var_declaration(Scope* p, TokenList* tk) {
     Token* type_tk = eat_token(tk, TK_TYPE_KEYWORD);
+    Type type = type_tk->data.type;
     Token* name = consume_token(tk);
     VariableAssignment va = {
-        type_tk->data.type,
-        zero_expr(),
+        type,
+        zero_expr(name),
         {
             name->data.ident,
             0
@@ -59,6 +77,7 @@ Statement parse_var_declaration(Scope* p, TokenList* tk) {
     if (next_token(tk)->type == TK_ASSIGN) {
         eat_token(tk, TK_ASSIGN);
         Expr expr = parse_expr(p, tk);
+        check_types(type, expr.type, next_token(tk));
         eat_token(tk, TK_SEMICOLON);
         va.val = expr;
         add_variable(p, *name, type_tk->data.type, 0);
@@ -78,12 +97,14 @@ Statement parse_var_declaration(Scope* p, TokenList* tk) {
 
 Statement parse_var_redeclaration(Scope* p, TokenList* tk) {
     Token* name = consume_token(tk);
+    Type type = get_var_type(p, *name);
 
     eat_token(tk, TK_ASSIGN);
     Expr expr = parse_expr(p, tk);
+    check_types(type, expr.type, next_token(tk));
     eat_token(tk, TK_SEMICOLON);
     VariableAssignment va = {
-        get_var_type(p, *name),
+        type,
         expr,
         {
             name->data.ident,
@@ -107,6 +128,7 @@ Statement parse_statement(Scope* p, TokenList* tk) {
     ) {
         consume_token(tk);
     }
+
     Token* next = next_token(tk);
     // Variable definiton
     if (next->type == TK_TYPE_KEYWORD) {
@@ -162,25 +184,26 @@ Statement parse_function_definition(Scope* p, TokenList* tk) {
     Token* type_tk = eat_token(tk, TK_TYPE_KEYWORD);
     Token* name = consume_token(tk);
     add_variable(p, *name, type_tk->data.type, 0);
+
+    Scope* subscope = new_scope(p);
+
     eat_token(tk, TK_LPAREN);
     
     StmtList args;
     vec_init(&args);
-
-    parse_arg_list(p, tk, &args);
+    parse_arg_list(subscope, tk, &args);
 
     eat_token(tk, TK_RPAREN);
-    eat_token(tk, TK_LCURLY);
 
-    Scope* subscope = new_scope(p);
+    StmtList body = { 0 };
 
-    StmtList body = parse_block(subscope, tk);
+    if (next_token(tk)->type == TK_LCURLY) {
+        consume_token(tk);
+        body = parse_block(subscope, tk);
+        eat_token(tk, TK_RCURLY);
+    }
 
     deinit_scope(subscope);
-
-    eat_token(tk, TK_RCURLY);
-
-    if (next_token(tk)->type == TK_SEMICOLON) eat_token(tk, TK_SEMICOLON);
 
     FunctionDefinition fd = {
         type_tk->data.type,
@@ -188,6 +211,9 @@ Statement parse_function_definition(Scope* p, TokenList* tk) {
         args,
         body
     };
+
+    if (next_token(tk)->type == TK_SEMICOLON) eat_token(tk, TK_SEMICOLON);
+
     StmtVal sv;
     sv.function_definition = fd;
     Statement fn = {
@@ -198,13 +224,16 @@ Statement parse_function_definition(Scope* p, TokenList* tk) {
     return fn;
 }
 
-Statement temporary_variable_assignment(Scope* p, Expr e, const char* name) {
-    Type tp;
-    if (e.var == VARIABLE_IDENT) {
+Statement temporary_variable_assignment(Scope* p, Expr e, char* name) {
+    Type tp = e.type;
+    /*
+    if (e.var == VARIABLE_IDENT || e.var == FUNCTION_CALL) {
         tp = get_var_type(p, *(e.start));
     } else {
+        print_expr(&e, 0);
         tp = get_expr_type(&e);
     }
+    */
 
     VariableAssignment va = {
         tp,
@@ -262,7 +291,8 @@ VariableIdent flatten_bin_expr(StmtList* list, Statement* st, Scope* p, Token* t
         Expr l_e = {
             VARIABLE_IDENT,
             ev,
-            l.start
+            l.start,
+            e->l->type
         };
 
         *(st->val.variable_assignment.val.val.bin_expr->l) = l_e;
@@ -294,7 +324,8 @@ VariableIdent flatten_bin_expr(StmtList* list, Statement* st, Scope* p, Token* t
         Expr r_e = {
             VARIABLE_IDENT,
             ev,
-            r.start
+            r.start,
+            e->r->type
         };
 
         *(st->val.variable_assignment.val.val.bin_expr->r) = r_e;
@@ -304,6 +335,11 @@ VariableIdent flatten_bin_expr(StmtList* list, Statement* st, Scope* p, Token* t
 
     if (increase) st->val.variable_assignment.vi.version = increase_var_version(p, *target_var_tk);
     push_stmt(list, *st);
+
+    // check l
+    check_types(var.type, e->l->type, e->l->start);
+    // check r
+    check_types(var.type, e->r->type, e->r->start);
 
     return var.vi;
 }

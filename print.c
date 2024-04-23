@@ -88,9 +88,13 @@ void print_statement(Statement* stmt, int indent) {
             print_stmt_list(fd.args, indent + 1, "");
         }
         print_indent(indent, ")");
-        printf("{\n");
-        print_program(&fd.body, indent + 1);
-        print_indent(indent, "}\n");
+        if (fd.body.length > 0) {
+            printf("{\n");
+            print_program(&fd.body, indent + 1);
+            print_indent(indent, "}\n");
+        } else {
+            printf(";\n");
+        }
     } else if (var == STMT_BLOCK) {
         print_block(stmt->val.block, indent);
     } else if (var == STMT_PROGRAM) {
@@ -117,7 +121,11 @@ void print_expr(Expr *node, int indent) {
     ExprVar var = node->var;
     
     if (var == VAL) {
-        printf("#%d", node->val.val);
+        if (node->type == INT) {
+            printf("%d", node->val.integer);
+        } else if (node->type == FLOAT) {
+            printf("%f", node->val.floating);
+        }
     } else if (var == BIN_EXPR) {
         print_expr(node->val.bin_expr->l, indent + 1);
         printf(" %s ", op_enum_to_char(node->val.bin_expr->op));
@@ -139,19 +147,12 @@ void print_expr(Expr *node, int indent) {
 }
 
 void print_type_keyword(Type type) {
-    switch (type) {
-        case VOID:
-            printf("void");
-            break;
-        case INT:
-            printf("int");
-            break;
-        case NONE_TYPE:
-            printf("TYPE");
-            break;
-        default:
-            printf("Unknown type: %d", type);
+    if (type == NONE_TYPE) {
+        printf("TYPE");
+    } else {
+        printf("%s", type_to_string(type));
     }
+
 }
 
 void print_vars(Scope* p) {
@@ -176,8 +177,11 @@ void print_token(Token* t){
         case TK_DIV:
             printf("/");
             break;
-        case TK_NUM:
-            printf("$%d", t->data.num);
+        case TK_INT:
+            printf("$%d", t->data.integer);
+            break;
+        case TK_FLOAT:
+            printf("$%f", t->data.floating);
             break;
         case TK_EOF:
             printf("EOF");
@@ -249,7 +253,9 @@ void printTokens(TokenList* t) {
 const char* type_to_string(Type type) {
     switch (type) {
         case INT:
-            return "integer";
+            return "int";
+        case FLOAT:
+            return "float";
         case VOID:
             return "void";
         default:
