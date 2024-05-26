@@ -1,21 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define GLOBAL_TYPES
 #include "slow_c.h"
+TypeList* global_types = NULL;
+
+// #define DBG 1
 
 char current_file[256];
 
-void test_idk() {
-    printf("\033[94mTesting IDK\033[0m\n");
-    int s_return = system("idk.exe");
-    system("gcc idk.c -o idk.exe");
-    int g_return = system("idk.exe");
-
-    printf("\033[93ms_return:\033[0m %d\n", s_return);
-    printf("\033[93mg_return:\033[0m %d\n", g_return);
-}
-
-char* load_file(char const* path) {
+char* load_file(char const* path)
+{
     char* buffer = 0;
     long length;
     FILE * f = fopen (path, "rb");
@@ -59,47 +54,45 @@ int main(int argc, char *argv[]) {
     file_path[strlen(file_path_with_extenstion) - 2] = '\0';
 
     // ------------ Tokenize --------------
-    TokenList tokens = {0};
+    TokenList tokens;
+    vec_init(&tokens);
     tokens.pars_ptr = 0;
     tokenize(&tokens, buff);
 
     // printf("\033[94mParsed Tokens:\033[0m\n");
     // printTokens(tokens);
-
+    
     // ------------ Parse --------------
-    Program program = parse(tokens);
     printf("\033[94mParsed Program:\033[0m\n");
-    print_program(&program, 0);
+    Program program = parse(tokens);
+    // print_program(&program, 0);
+
+    // ------------ Semantic Checks -------------
+
+    printf("\033[94mSemantic Checks:\033[0m\n");
+    post_processing(&program);
 
     // ----------- Generate IR ------------
+
     printf("\033[94mGenerating IR:\033[0m\n");
 
-    // ---------- Convert to ASM ----------
-    printf("\033[94mGenerating ASM:\033[0m\n");
-    /*
     FILE* f = fopen("tmp.s", "w");
     generate_asm(f, &program);
-    fclose(f);
-    */
 
+    fclose(f);
     // ---------- Convert to ASM ----------
     printf("\033[94mAssembling:\033[0m\n");
 
     char* asm_file_command = (char*) malloc(sizeof(char) * 256);
-
-    sprintf(asm_file_command, "gcc tmp.s -o %s.exe", file_path);
-    system(asm_file_command);
-
+    sprintf(asm_file_command, "gcc tmp.s -o %s", file_path);
     printf("%s\n", asm_file_command);
+    system(asm_file_command);
     free(asm_file_command);
+    
 
     // ---------- Cleanup ----------
     free_token_list_and_data(&tokens);
     free_program(program);
     free(buff);
-
-    test_idk();
-
-    printf("\033[92mDone\033[0m\n");
 	return 0;
 }

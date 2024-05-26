@@ -1,11 +1,7 @@
 #include "slow_c.h"
 
 void free_token_list_and_data(TokenList* list) {
-    int i; Token tk;
-    vec_foreach(list, tk, i) {
-        if (tk.type == TK_IDENT) free(tk.data.ident);
-    }
-    vec_deinit(list);
+    arrfree(list->data);
 }
 
 void free_expr_list(ExprList);
@@ -14,19 +10,17 @@ void free_expr_children(Expr*);
 void free_statement_children(Statement*);
 
 void free_expr_list(ExprList list) {
-    int i; Expr nd;
-    vec_foreach(&list, nd, i) {
-        free_expr_children(&nd);
+    for (int i = 0; arrlen(list) > i; i++) {
+        free_expr_children(&list[i]);
     }
-    vec_deinit(&list);
+    arrfree(list);
 }
 
 void free_stmt_list(StmtList list) {
-    int i; Statement nd;
-    vec_foreach(&list, nd, i) {
-        free_statement_children(&nd);
+    for (int i = 0; arrlen(list.data) > i; i++) {
+        free_statement_children(&list.data[i]);
     }
-    vec_deinit(&list);
+    arrfree(list.data);
 }
 
 void free_statement_children(Statement* st) {
@@ -60,6 +54,7 @@ void free_expr_children(Expr* nd){
         printf("Tried to free a null expr\n");
         my_exit(-1);
     }
+    printf("freeing expr %d\n", nd->var);
 
     ExprVar var = nd->var;
     if (var == BIN_EXPR) {

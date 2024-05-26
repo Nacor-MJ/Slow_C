@@ -81,7 +81,7 @@ Token* next_token(TokenList* tk) {
 }
 
 Token* next_token_with_offset(TokenList* tk, int offset) {
-    if (tk->pars_ptr + offset > tk->length) {
+    if (tk->pars_ptr + offset > arrlen(tk)) {
         printf("\033[91mERROR: out of bounds\033[0m");
         my_exit(-1);
     }
@@ -112,10 +112,7 @@ void tokenize_num(Token* tk, char** src){
     }
 }
 void add_token(TokenList* tks, Token tk) {
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wunused-value"
-    vec_push(tks, tk);
-    #pragma GCC diagnostic pop
+    arrput(tks->data, tk);
 }
 
 // Compares two tokens and their data
@@ -243,19 +240,19 @@ void tokenize(TokenList* tk, char* src) {
                 } else if (strncmp(src, "return", 3) == 0) {
                     src += 6;
                     tmp.type = TK_RETURN;
-                    tmp.data.type = VOID;
+                    tmp.data.type = ty_void;
                 } else if (strncmp(src, "void", 3) == 0) {
                     src += 4;
                     tmp.type = TK_TYPE_KEYWORD;
-                    tmp.data.type = VOID;
+                    tmp.data.type = ty_void;
                 } else if (strncmp(src, "int", 3) == 0) {
                     src += 3;
                     tmp.type = TK_TYPE_KEYWORD;
-                    tmp.data.type = INT;
+                    tmp.data.type = ty_int;
                 } else if (strncmp(src, "float", 5) == 0) {
                     src += 5;
                     tmp.type = TK_TYPE_KEYWORD;
-                    tmp.data.type = FLOAT;
+                    tmp.data.type = ty_float;
                 } else {
                     char* buff;
                     int i = 0;
@@ -279,9 +276,7 @@ void tokenize(TokenList* tk, char* src) {
                     tmp.data.ident = buff;
                 }
         }
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wunused-value"
-        vec_push(tk, tmp);
+        arrput(tk->data, tmp);
         skip_whitespace(&src);
     }
     Token eof = {
@@ -289,8 +284,7 @@ void tokenize(TokenList* tk, char* src) {
         {0},
         NULL,
     };
-    vec_push(tk, eof);
-    #pragma GCC diagnostic pop
+    arrput(tk->data, eof);
 }
 
 #endif

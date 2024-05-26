@@ -5,7 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-#include "vec.h"
+#include <stdlib.h>
+
+#include "stb_ds.h"
+
 
 // this is the best function I have here
 static void inline __attribute__((noreturn)) fuck(int i, const char* a, int b) {
@@ -17,13 +20,63 @@ static void inline __attribute__((noreturn)) fuck(int i, const char* a, int b) {
 
 typedef struct Expr Expr;
 typedef struct Statement Statement;
+typedef struct Type Type;
 
-typedef enum Type {
-    NONE_TYPE,
-    VOID,
-    INT,
-    FLOAT
+typedef enum TypeKind {
+    TY_NONE,
+
+    TY_INT,
+    TY_FLOAT,
+    TY_CHAR,
+    TY_BOOL,
+
+    TY_VOID,
+
+    TY_FUNC,
+
+    TY_STRUCT,
+    TY_UNION,
+    TY_ENUM,
+    TY_ARRAY,
+
+    TY_PTR,
+} TypeKind;
+typedef Type* Types;
+
+typedef struct Member {
+    char* name;
+    Type* type;
+    int offset;
+} Member;
+typedef Member* Members;
+typedef struct FuncData {
+    Types return_type;
+    Types param_type;
+} FuncData;
+typedef struct PointerData {
+    Type* type;
+    int array_len;
+} PointerData;
+typedef union TypeData {
+    Members members; // structs
+    PointerData base; // pointers and arrays
+    FuncData func;
+} TypeData;
+
+typedef struct Type {
+    TypeKind kind;
+    int size;
+    int allign;
+    // int _is_signed;
+    TypeData data;
 } Type;
+
+extern Type* ty_none;
+extern Type *ty_void;
+extern Type *ty_bool;
+extern Type *ty_char;
+extern Type *ty_int;
+extern Type *ty_float;
 
 //
 // tokens.c
@@ -60,7 +113,7 @@ typedef union {
     int integer;
     float floating;
     char* ident;
-    Type type;
+    Type* type;
 } TokenData;
 typedef struct {
     TokenType type;
@@ -68,11 +121,8 @@ typedef struct {
     char* start_of_token;
 } Token;
 
-// if you change vec_t this will get fucked up <3
 typedef struct { 
-    Token *data;
-    int length;
-    int capacity;
+    Token* data;
     int pars_ptr;
 } TokenList;
 
@@ -84,82 +134,6 @@ Token* next_token_with_offset(TokenList* tk, int offset);
 void printTokens(TokenList* t);
 bool compare_tokens(Token a, Token b);
 void tokenize(TokenList* tk, char* src);
-
-//
-// assembly.c
-//
-
-typedef enum Reg{
-    RAX,
-    RCX,
-    RDX,
-    R8,
-    R9,
-    R10,
-    R11,
-    INVALID, // this needs to be right after the 64bit general purpose registers because of the increase_reg function
-    AL,
-    R15,
-    NA
-} Reg;
-
-typedef enum InstructionType {
-    // data transfer
-    MOV,
-    MOVZX,
-
-    // arithmetic
-    ADD,
-    MUL,
-    DIV,
-    SUB,
-
-    // binops
-    SETE,
-    SETNE,
-    SETG,
-    SETL,
-    SETGE,
-    SETLE,
-
-    // cmp
-    CMP,
-    TEST,
-
-    // stack manipulation
-    PUSH,
-    POP,
-
-    // functions
-    CALL,
-    RETURN_INSTR,
-
-    // NOP
-    NOP
-} InstructionType;
-
-typedef union InstructionVal{
-    Reg reg;
-    int constant;
-    char* function_name;
-} InstructionVal;
-
-typedef enum {
-    REG_CONST,
-    REG_REG,
-    REG,
-    CONST,
-    FUNCTION_NAME,
-    NONE
-} InstructionArgs;
-typedef struct Instruction Instruction;
-typedef struct Instruction{
-    InstructionType type;
-    InstructionVal first_arg;
-    InstructionVal second_arg;
-    InstructionArgs args;
-    Instruction* next;
-} Instruction;
 
 //
 // parser.c
@@ -181,9 +155,23 @@ typedef enum {
 } Binop;
 const char* op_enum_to_char(Binop op);
 
-typedef vec_t(Expr) ExprList;
+typedef struct {
+    char* key;
+    Type* value;
+} Variable;
 
-typedef vec_t(Statement) StmtList;
+typedef struct Scope Scope;
+typedef struct Scope {
+    Variable* variables;
+    Scope* parent;
+} Scope;
+
+typedef Expr* ExprList;
+typedef struct StmtList {
+    Statement* data;
+    Scope* scope;
+} StmtList;
+StmtList new_stmt_list(Scope* );
 
 typedef StmtList Program;
 
@@ -194,14 +182,12 @@ typedef struct {
 } BinExpr;
 
 typedef struct {
-    Type type;
+    Type* type;
     char* name;
     ExprList args;
 } FunctionCall;
 typedef struct {
     char* name;
-    int version;
-    int ref_count;
 } VariableIdent;
 
 typedef union {
@@ -222,18 +208,18 @@ typedef struct Expr {
     ExprVar var;
     ExprVal val;
     Token* start;
-    Type type;
+    Type* type;
 } Expr;
 
 
 typedef struct {
-    Type type;
+    Type* type;
     char* name;
     StmtList args;
     StmtList body;
 } FunctionDefinition;
 typedef struct {
-    Type type;
+    Type* type;
     Expr val;
     VariableIdent vi;
 } VariableAssignment;
@@ -271,21 +257,6 @@ typedef struct Statement {
 void free_stmt_list(StmtList);
 Program parse(TokenList src);
 
-typedef vec_t(char*) VariablesNames;
-typedef vec_t(Type) VariablesTypes;
-typedef vec_t(int) VariablesVersions;
-// Oh yes a hashmap
-typedef struct {
-    VariablesNames names;
-    VariablesTypes types;
-    VariablesVersions versions;
-} Variables;
-
-typedef struct Scope Scope;
-typedef struct Scope {
-    Variables variables;
-    Scope* parent;
-} Scope;
 Scope* new_scope(Scope* parent);
 void deinit_scope();
 
@@ -304,17 +275,15 @@ void parse_arg_list(Scope*p, TokenList* tk, StmtList* list);
 void append_statement(StmtList* list, Statement nd);
 void append_expr(ExprList* list, Expr nd);
 
-void flatten_statement(StmtList* list, Statement stmt, Scope* p);
-
-void check_types(Type t1, Type t2, Token* tk);
+void check_types(Type* t1, Type* t2, Token* tk);
 
 //
 // scope.c
 //
 
-void add_variable(Scope* p, Token var, Type type, int version);
+void add_variable(Scope* p, Token var, Type* type, int version);
 int increase_var_version(Scope* p, Token var);
-Type get_var_type(Scope* p, Token var);
+Type* get_var_type(Scope* p, Token var);
 int get_var_version(Scope* p, Token var);
 
 Scope* new_scope(Scope* parent);
@@ -327,7 +296,7 @@ void deinit_scope(Scope* s);
 Expr zero_expr(Token* );
 Expr parse_function_call(Scope* p, TokenList* tk);
 Expr parse_expr(Scope*, TokenList*);
-Type get_expr_type(Expr*);
+Type* get_expr_type(Expr*);
 
 
 //
@@ -340,10 +309,10 @@ void post_processing(Program* root);
 // print.c
 //
 
-const char* type_to_string(Type);
+const char* type_to_string(Type*);
 void print_vars(Scope* p);
 void print_token(Token*);
-void print_type_keyword(Type);
+void print_type_keyword(Type*);
 void print_program(Program*, int);
 void print_statement(Statement*, int);
 void print_expr(Expr*, int);
@@ -355,10 +324,14 @@ void print_expr(Expr*, int);
 void free_program(Program);
 void free_token_list_and_data(TokenList* list);
 
-//
+// 
 // assembly.c
 //
 
-void generate_asm(FILE* f, Program* root);
+void generate_asm(FILE* f, Program* program);
+
+// 
+// ir.c
+//
 
 #endif

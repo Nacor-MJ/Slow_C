@@ -1,5 +1,5 @@
 #include "slow_c.h"
 
-void generate_ir() {
+int temporary_count = 0;
+int loop_label_count = 0;
 
-}

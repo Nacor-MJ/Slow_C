@@ -5,7 +5,7 @@
 
 char* absolute_start;
 
-void check_types(Type t1, Type t2, Token* tk) {
+void check_types(Type* t1, Type* t2, Token* tk) {
     if (t1 != t2) {
         printf("\033[31mType mismatch %s!=%s\033[0m", type_to_string(t1), type_to_string(t2));
 
@@ -21,17 +21,12 @@ void check_types(Type t1, Type t2, Token* tk) {
     }
 }
 
+// TODO check if this screws up the list thingie, idk how the modifying of lengths works
 void append_expr(ExprList* list, Expr nd) {
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wunused-value"
-    vec_push(list, nd);
-    #pragma GCC diagnostic pop
+    arrput(*list, nd);
 }
 void append_statement(StmtList* list, Statement nd) {
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wunused-value"
-    vec_push(list, nd);
-    #pragma GCC diagnostic pop
+    arrput(list->data, nd);
 }
 
 void parse_arg_list(Scope*p, TokenList* tk, StmtList* list) {
@@ -46,7 +41,6 @@ void parse_arg_list(Scope*p, TokenList* tk, StmtList* list) {
             zero_expr(name),
             {
                 name->data.ident,
-                0
             }
         };
         sv.variable_assignment = va; 
@@ -64,14 +58,13 @@ void parse_arg_list(Scope*p, TokenList* tk, StmtList* list) {
 
 Statement parse_var_declaration(Scope* p, TokenList* tk) {
     Token* type_tk = eat_token(tk, TK_TYPE_KEYWORD);
-    Type type = type_tk->data.type;
+    Type* type = type_tk->data.type;
     Token* name = consume_token(tk);
     VariableAssignment va = {
         type,
         zero_expr(name),
         {
             name->data.ident,
-            0
         }
     };
     if (next_token(tk)->type == TK_ASSIGN) {
@@ -84,7 +77,6 @@ Statement parse_var_declaration(Scope* p, TokenList* tk) {
     } else {
         add_variable(p, *name, type_tk->data.type, -1);
         eat_token(tk, TK_SEMICOLON);
-        va.vi.version = -1;
     }
 
     StmtVal sv = { va };
@@ -97,7 +89,7 @@ Statement parse_var_declaration(Scope* p, TokenList* tk) {
 
 Statement parse_var_redeclaration(Scope* p, TokenList* tk) {
     Token* name = consume_token(tk);
-    Type type = get_var_type(p, *name);
+    Type* type = get_var_type(p, *name);
 
     eat_token(tk, TK_ASSIGN);
     Expr expr = parse_expr(p, tk);
@@ -108,7 +100,6 @@ Statement parse_var_redeclaration(Scope* p, TokenList* tk) {
         expr,
         {
             name->data.ident,
-            increase_var_version(p, *name)
         }
     };
 
@@ -185,13 +176,11 @@ Statement parse_function_definition(Scope* p, TokenList* tk) {
     Token* name = consume_token(tk);
     add_variable(p, *name, type_tk->data.type, 0);
 
-    Scope* subscope = new_scope(p);
+    StmtList args = new_stmt_list(p);
 
     eat_token(tk, TK_LPAREN);
     
-    StmtList args;
-    vec_init(&args);
-    parse_arg_list(subscope, tk, &args);
+    parse_arg_list(args.scope, tk, &args);
 
     eat_token(tk, TK_RPAREN);
 
@@ -199,11 +188,9 @@ Statement parse_function_definition(Scope* p, TokenList* tk) {
 
     if (next_token(tk)->type == TK_LCURLY) {
         consume_token(tk);
-        body = parse_block(subscope, tk);
+        body = parse_block(args.scope, tk);
         eat_token(tk, TK_RCURLY);
     }
-
-    deinit_scope(subscope);
 
     FunctionDefinition fd = {
         type_tk->data.type,
@@ -221,201 +208,28 @@ Statement parse_function_definition(Scope* p, TokenList* tk) {
         sv,
         type_tk
     };
+    printf("%p\n", args.scope);
     return fn;
 }
 
-Statement temporary_variable_assignment(Scope* p, Expr e, char* name) {
-    Type tp = e.type;
-    /*
-    if (e.var == VARIABLE_IDENT || e.var == FUNCTION_CALL) {
-        tp = get_var_type(p, *(e.start));
-    } else {
-        print_expr(&e, 0);
-        tp = get_expr_type(&e);
-    }
-    */
-
-    VariableAssignment va = {
-        tp,
-        e,
-        {
-            name,
-            0
-        }
-    };
-
-    StmtVal sv = { va };
-    Statement st = {
-        STMT_VARIABLE_ASSIGNMENT,
-        sv,
-        e.start
-    };
-    return st;
-}
-
 void push_stmt(StmtList* list, Statement st) {
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wunused-value"
-    vec_push(list, st);
-    #pragma GCC diagnostic pop
-}
-
-// TODO fix this unholy mess of a function
-// honestly this is horrible but it seems to work for now :D
-VariableIdent flatten_bin_expr(StmtList* list, Statement* st, Scope* p, Token* target_var_tk) {
-    bool increase = false; // should the variable version be increased
-    VariableAssignment var = st->val.variable_assignment;
-    BinExpr* e = var.val.val.bin_expr;
-
-    // TODO create a function export_BinExpr(BinExpr*) -> VariableIdent
-
-    if (e->l->var == BIN_EXPR) {
-        StmtVal sv;
-        sv.variable_assignment = (VariableAssignment) {
-            get_expr_type(e->l),
-            *(e->l),
-            {
-                var.vi.name,
-                get_var_version(p, *target_var_tk)
-            }
-        };
-        Statement l = {
-            STMT_VARIABLE_ASSIGNMENT,
-            sv,
-            e->l->start
-        };
-
-        VariableIdent l_vi = flatten_bin_expr(list, &l, p, target_var_tk);
-        ExprVal ev;
-        ev.variable_ident = l_vi;
-        Expr l_e = {
-            VARIABLE_IDENT,
-            ev,
-            l.start,
-            e->l->type
-        };
-
-        *(st->val.variable_assignment.val.val.bin_expr->l) = l_e;
-        increase = true;
-    }
-    if (e->r->var == BIN_EXPR) {
-
-        StmtVal sv;
-        int version;
-        if (increase) version = increase_var_version(p, *target_var_tk);
-        else version = get_var_version(p, *target_var_tk);
-        sv.variable_assignment = (VariableAssignment) {
-            get_expr_type(e->r),
-            *(e->r),
-            {
-                var.vi.name,
-                version
-            }
-        };
-        Statement r = {
-            STMT_VARIABLE_ASSIGNMENT,
-            sv,
-            e->r->start
-        };
-
-        VariableIdent r_vi = flatten_bin_expr(list, &r, p, target_var_tk);
-        ExprVal ev;
-        ev.variable_ident = r_vi;
-        Expr r_e = {
-            VARIABLE_IDENT,
-            ev,
-            r.start,
-            e->r->type
-        };
-
-        *(st->val.variable_assignment.val.val.bin_expr->r) = r_e;
-        increase = true;
-    }
-
-
-    if (increase) st->val.variable_assignment.vi.version = increase_var_version(p, *target_var_tk);
-    push_stmt(list, *st);
-
-    // check l
-    check_types(var.type, e->l->type, e->l->start);
-    // check r
-    check_types(var.type, e->r->type, e->r->start);
-
-    return var.vi;
-}
-
-void flatten_var_assignment(StmtList* list, Statement stmt, Scope* p) {
-    VariableAssignment va = stmt.val.variable_assignment;
-    StmtVal sv;
-    sv.variable_assignment = va;
-    Statement st = {
-        STMT_VARIABLE_ASSIGNMENT,
-        sv,
-        stmt.start
-    };
-
-    Token tk = *(stmt.start);
-    tk.data.ident = va.vi.name;
-
-    if (va.val.var == BIN_EXPR) {
-        flatten_bin_expr(list, &st, p, &tk);
-    } else {
-        push_stmt(list, st);
-    }
-}
-
-void flatten_block(StmtList* list, Statement stmt, Scope* p) {
-    StmtList b = stmt.val.block;
-    for (int i = 0; i < b.length; i++) {
-        flatten_statement(list, b.data[i], p);
-    }
-}
-
-void flatten_statement(StmtList* list, Statement stmt, Scope* p) {
-    if (stmt.var == STMT_BLOCK || stmt.var == STMT_PROGRAM) {
-        flatten_block(list, stmt, p);
-    } else if (stmt.var == STMT_VARIABLE_ASSIGNMENT) {
-        flatten_var_assignment(list, stmt, p);
-    } else if (stmt.var == STMT_FUNCTION_DEFINITION) {
-        flatten_block(list, stmt, p);
-    } else if (stmt.var == STMT_RETURN) {
-        Statement rt = temporary_variable_assignment(p, stmt.val.return_, "return");
-        flatten_var_assignment(list, rt, p);
-    } else if (stmt.var == STMT_THROWAWAY) {
-        Statement th = temporary_variable_assignment(p, stmt.val.throw_away, "throw");
-        flatten_var_assignment(list, th, p);
-    } else {
-        printf("flatten statement not implemented for %d\n", stmt.var);
-        my_exit(-1);
-    }
+    arrput(list->data, st);
 }
 
 StmtList parse_block(Scope* p, TokenList* tk) {
-    StmtList result;
-    vec_init(&result);
+    StmtList result = new_stmt_list(p);
 
     Statement next;
     while (next_token(tk)->type != TK_RCURLY) {
         next = parse_statement(p, tk);
 
-
-        StmtList tmp;
-        vec_init(&tmp);
-        flatten_statement(&tmp, next, p);
-
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wunused-value"
-        vec_extend(&result, &tmp);
-        #pragma GCC diagnostic pop
-
-        vec_deinit(&tmp);
+        arrput(result.data, next);
     }
     return result;
 }
 
 Program parse_program(Parser* p, TokenList* tk) {
-    Program result;
-    vec_init(&result);
+    Program result = new_stmt_list(p->global_scope);
 
     Statement next;
     while (next_token(tk)->type != TK_EOF) {
@@ -429,10 +243,7 @@ Program parse_program(Parser* p, TokenList* tk) {
 
         // TODO check that there are no function calls or redeclarations in the global scope
 
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wunused-value"
-        vec_push(&result, next);
-        #pragma GCC diagnostic pop
+        arrput(result.data, next);
     }
     return result;
 }
@@ -441,22 +252,11 @@ Program parse(TokenList src){
     Parser p;
     p.global_scope = new_scope(NULL);
 
-    TokenData td;
-    td.ident = "print";
-    Token print_tk = {
-        TK_IDENT,
-        td,
-        NULL,
-    };
-    add_variable(p.global_scope, print_tk, VOID, 0);
-
     src.pars_ptr = 0;
 
     absolute_start = next_token(&src)->start_of_token;
 
     Program result = parse_program(&p, &src);
-
-    deinit_scope(p.global_scope);
     return result;
 }
 

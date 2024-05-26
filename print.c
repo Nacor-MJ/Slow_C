@@ -1,6 +1,5 @@
 #include "slow_c.h"
 
-
 const char* op_enum_to_char(Binop bp) {
     switch (bp) {
         case OP_INVALID:
@@ -33,16 +32,15 @@ const char* op_enum_to_char(Binop bp) {
 void print_indent(int level, const char* end) {
     if (level < 0) return;
     for (int i = 0; i < level; ++i) {
-        printf("  ");  // Assuming 2 spaces per indentation level
+        printf("  ");
     }
     printf("%s", end);
 }
 
 void print_program(Program* block, int indent) {
-    int i; Statement nd;
-    vec_foreach(block, nd, i) {
+    for (int i = 0; arrlen(block->data) > i; i++) {
         print_indent(indent, "");
-        print_statement(&nd, indent);
+        print_statement(&block->data[i], indent);
     }
 }
 
@@ -53,16 +51,14 @@ void print_block(StmtList block, int indent) {
 }
 
 void print_expr_list(ExprList list, int indent, const char* separator) {
-    int i; Expr nd;
-    vec_foreach(&list, nd, i) {
-        print_expr(&nd, indent);
+    for (int i = 0; arrlen(list) > i; i++) {
+        print_expr(&list[i], indent);
         printf("%s", separator);
     }
 }
 void print_stmt_list(StmtList list, int indent, const char* separator) {
-    int i; Statement nd;
-    vec_foreach(&list, nd, i) {
-        print_statement(&nd, indent);
+    for (int i = 0; arrlen(list.data) > i; i++) {
+        print_statement(&list.data[i], indent);
         printf("%s", separator);
     }
 }
@@ -72,7 +68,7 @@ void print_statement(Statement* stmt, int indent) {
     if (var == STMT_VARIABLE_ASSIGNMENT) {
         VariableAssignment va = stmt->val.variable_assignment;
         print_type_keyword(va.type);
-        printf(" %s%d", va.vi.name, va.vi.version);
+        printf(" %s", va.vi.name);
         if (va.val.var != EMPTY_EXPR) {
             printf(" = ");
             print_expr(&va.val, indent);
@@ -82,13 +78,13 @@ void print_statement(Statement* stmt, int indent) {
         FunctionDefinition fd = stmt->val.function_definition;
         print_type_keyword(fd.type);
         printf(" %s(", fd.name);
-        if (fd.args.length > 0) {
+        if (arrlen(fd.args.data) > 0) {
             printf("\n");
             print_indent(indent + 1, "");
             print_stmt_list(fd.args, indent + 1, "");
         }
         print_indent(indent, ")");
-        if (fd.body.length > 0) {
+        if (arrlen(fd.body.data) > 0) {
             printf("{\n");
             print_program(&fd.body, indent + 1);
             print_indent(indent, "}\n");
@@ -121,9 +117,9 @@ void print_expr(Expr *node, int indent) {
     ExprVar var = node->var;
     
     if (var == VAL) {
-        if (node->type == INT) {
+        if (node->type->kind == TY_INT) {
             printf("%d", node->val.integer);
-        } else if (node->type == FLOAT) {
+        } else if (node->type->kind == TY_FLOAT) {
             printf("%f", node->val.floating);
         }
     } else if (var == BIN_EXPR) {
@@ -133,21 +129,21 @@ void print_expr(Expr *node, int indent) {
     } else if (var == FUNCTION_CALL) {
         FunctionCall fc = node->val.function_call;
         printf("%s(", fc.name);
-        if (fc.args.length > 0) {
+        if (arrlen(fc.args) > 0) {
             print_expr_list(fc.args, 0, ", ");
         }
         printf(")");
     } else if (var == VARIABLE_IDENT) {
         VariableIdent vi = node->val.variable_ident;
-        printf("%s%d", vi.name, vi.version);
+        printf("%s", vi.name);
     } else {
         print_indent(indent, "");
         printf("\nprint_expr not implemented for: %d\n", node->var);
     }
 }
 
-void print_type_keyword(Type type) {
-    if (type == NONE_TYPE) {
+void print_type_keyword(Type* type) {
+    if (type == TY_NONE) {
         printf("TYPE");
     } else {
         printf("%s", type_to_string(type));
@@ -156,10 +152,10 @@ void print_type_keyword(Type type) {
 }
 
 void print_vars(Scope* p) {
-    int i; char* name;
-    vec_foreach(&p->variables.names, name, i) {
-        print_type_keyword(p->variables.types.data[i]);
-        printf(" $%s\n", name);
+    Variable* vars = p->variables;
+    for (int i = 0; shlen(vars) > i; i++) {
+        print_type_keyword(vars[i].value);
+        printf(" $%s\n", vars[i].key);
     }
 }
 
@@ -242,7 +238,7 @@ void print_token(Token* t){
 
 void printTokens(TokenList* t) {
     printf("\n");
-    for (int i = 0; i < t->length; i++) {
+    for (int i = 0; i < arrlen(t); i++) {
         print_token(&t->data[i]);
         TokenType tp = t->data[i].type;
         if (tp == TK_SEMICOLON || tp == TK_RCURLY || tp == TK_LCURLY) printf("\n");
@@ -250,13 +246,13 @@ void printTokens(TokenList* t) {
     printf("\n");
 }
 
-const char* type_to_string(Type type) {
-    switch (type) {
-        case INT:
+const char* type_to_string(Type* type) {
+    switch (type->kind) {
+        case TY_INT:
             return "int";
-        case FLOAT:
+        case TY_FLOAT:
             return "float";
-        case VOID:
+        case TY_VOID:
             return "void";
         default:
             return "Unknown";

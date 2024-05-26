@@ -6,10 +6,10 @@ OBJS=$(SRCS:.c=.o)
 # Stage 1
 
 Slow_C: $(OBJS)
-	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS) -g
+	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS) -g -lm
 	rm *.o
 
-$(OBJS): slow_c.h vec.h
+$(OBJS): slow_c.h
 
 gdb: Slow_C
 	gdb -ex run --args ./Slow_C.exe idk.c

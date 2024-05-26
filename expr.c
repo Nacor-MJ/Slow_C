@@ -9,7 +9,7 @@ Expr zero_expr(Token* start) {
         EMPTY_EXPR,
         ev,
         start,
-        NONE_TYPE
+        ty_none,
     };
     return e;
 }
@@ -42,10 +42,10 @@ Expr parse_function_call(Scope* p, TokenList* tk) {
 
     nv.function_call.name = var->data.ident;
 
-    Type tp = get_var_type(p, *var);
+    Type* tp = get_var_type(p, *var);
     nv.function_call.type = tp;
 
-    vec_init(&nv.function_call.args);
+    nv.function_call.args = NULL;
 
     eat_token(tk, TK_LPAREN);
 
@@ -84,7 +84,7 @@ Expr parse_factor(Scope* p, TokenList* tk){
             VAL,
             nv,
             start,
-            INT
+            ty_int
         };
         return nd;
     } else if (next->type == TK_FLOAT) {
@@ -95,7 +95,7 @@ Expr parse_factor(Scope* p, TokenList* tk){
             VAL,
             nv,
             start,
-            FLOAT
+            ty_int
         };
         return nd;
     } else if (next->type == TK_LPAREN){
@@ -112,7 +112,6 @@ Expr parse_factor(Scope* p, TokenList* tk){
         
         ExprVal ndata;
         ndata.variable_ident.name = name->data.ident;
-        ndata.variable_ident.version = get_var_version(p, *name);
         Expr nd = {
             VARIABLE_IDENT,
             ndata,
@@ -333,9 +332,8 @@ Expr parse_expr(Scope* p, TokenList* tk){
     return e;
 }
 
-Type get_expr_type(Expr* e){
-    Type tp;
-
+Type* get_expr_type(Expr* e){
+    Type* tp;
     switch (e->var) {
         case FUNCTION_CALL:
             tp = e->val.function_call.type;
@@ -344,7 +342,7 @@ Type get_expr_type(Expr* e){
             tp = get_expr_type(e->val.bin_expr->l);
             break;
         case VAL:
-            tp = INT;
+            tp = ty_int;
             break;
         default:
             printf("get_expr_type %d not implemented\n", e->var);
