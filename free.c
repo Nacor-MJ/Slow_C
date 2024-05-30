@@ -25,24 +25,30 @@ void free_stmt_list(StmtList list) {
 
 void free_statement_children(Statement* st) {
     if (
-        st->var == STMT_THROWAWAY ||
+        st->var == STMT_THROW_AWAY ||
         st->var == STMT_RETURN
     ) {
-        free_expr_children(&st->val.throw_away);
+        free_expr_children(&st->throw_away);
     } else if (st->var == STMT_VARIABLE_ASSIGNMENT) {
-        VariableAssignment* va = &st->val.variable_assignment;
+        VariableAssignment* va = &st->variable_assignment;
         free_expr_children(&va->val);
     } else if (st->var == STMT_PROGRAM || st->var == STMT_BLOCK) {
-        free_stmt_list(st->val.block);
+        free_stmt_list(st->block);
     } else if (st->var == STMT_FUNCTION_DEFINITION) {
-        FunctionDefinition* fd = &st->val.function_definition;
+        FunctionDefinition* fd = &st->function_definition;
         free_stmt_list(fd->body);
         free_stmt_list(fd->args);
     } else if (st->var == STMT_CONDITIONAL_JUMP) {
-        Conditional_jump* cj = &st->val.conditional_jump;
+        ConditionalJump* cj = &st->conditional_jump;
         free_expr_children(cj->condition);
-        free_expr_children(cj->true_block);
-        free_expr_children(cj->false_block);
+        free_statement_children(cj->then_block);
+        free_statement_children(cj->else_block);
+    } else if (st->var == STMT_LOOP) {
+        Loop* l = &st->loop;
+        free_expr_children(l->condition);
+        free_statement_children(l->body);
+        free_statement_children(l->increment);
+        free_statement_children(l->init);
     } else {
         printf("Not all statement types are freed %d\n", st->var);
         my_exit(-1);
@@ -54,7 +60,6 @@ void free_expr_children(Expr* nd){
         printf("Tried to free a null expr\n");
         my_exit(-1);
     }
-    printf("freeing expr %d\n", nd->var);
 
     ExprVar var = nd->var;
     if (var == BIN_EXPR) {
@@ -70,7 +75,7 @@ void free_expr_children(Expr* nd){
         free(be); // This is good <3
     } else if (var == VARIABLE_IDENT) {
         // pass
-    } else if (var == VAL ) {
+    } else if (var == EXPR_CONSTANT ) {
         // pas
     } else if (var == FUNCTION_CALL) {
         FunctionCall fc = nd->val.function_call;

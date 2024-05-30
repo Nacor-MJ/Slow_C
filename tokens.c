@@ -8,6 +8,7 @@ char* global_start_of_file;
 
 extern char current_file[256];
 
+// FIXME: this is a mess
 char* print_line(int line_num, char* line, int col_num) {
     char offset_string[16];
     snprintf(offset_string, 16, "%d | ", line_num);
@@ -26,6 +27,7 @@ char* print_line(int line_num, char* line, int col_num) {
 }
 
 // Prints The Error message and the line above and below the token
+// FIXME: this honestly sucks just improve it overall :D
 void print_error_tok(Token* tk, char* absolute_start) {
     print_token(tk);
     printf("\n\033[0m");
@@ -56,14 +58,16 @@ void print_error_tok(Token* tk, char* absolute_start) {
 
 }
 
-Token* consume_token(TokenList* tk){
+// consumes the next token in line
+Token* eat_token(TokenList* tk){
     Token* a = &tk->data[tk->pars_ptr];
     tk->pars_ptr += 1;
     return a;
 }
 
-Token* eat_token(TokenList* tk, TokenType check){
-    Token* next = consume_token(tk);
+// consumes the next token in line and returns it
+Token* eat_token_checked(TokenList* tk, TokenType check){
+    Token* next = eat_token(tk);
     if (next->type != check){
         printf("\033[91mERROR: expected ");
         Token check_tk = {check, {0}, NULL};
@@ -76,10 +80,14 @@ Token* eat_token(TokenList* tk, TokenType check){
     return next;
 }
 
+// returns the next token in line without consuming it
 Token* next_token(TokenList* tk) {
     return &tk->data[tk->pars_ptr];
 }
 
+// returns the token with offset,
+// offset 0 returns the same as Token* next_token(TokenList*)
+// we are doing bounds checking
 Token* next_token_with_offset(TokenList* tk, int offset) {
     if (tk->pars_ptr + offset > arrlen(tk)) {
         printf("\033[91mERROR: out of bounds\033[0m");
@@ -88,11 +96,28 @@ Token* next_token_with_offset(TokenList* tk, int offset) {
     return &tk->data[tk->pars_ptr + offset];
 }
 
-void skip_whitespace(char** src) {
-    while (isspace((int) **src)) {
+// consumes whitespaces 
+// ' ', '\n', '\t', '\r', '\v', '\f'
+void skip_whitespace_comments(char** src) {
+    while (isspace((int) **src)) *src += 1;
+
+    // comments
+    if (**src == '/' && *(*src + 1) == '/') {
+        while (**src != '\n') *src += 1;
         *src += 1;
+    } else if (**src == '/' && *(*src + 1) == '*') {
+        *src += 2;
+        while (**src != '*' || *(*src + 1) != '/') *src += 1;
+        *src += 2;
     }
+
+    while (isspace((int) **src)) *src += 1;
 }
+
+// convert the numerical string to a token
+//
+// god knows what happens when someone tries to use non decimal
+// base with floats
 void tokenize_num(Token* tk, char** src){
     int num = strtol(*src, src, 0);
 
@@ -134,6 +159,7 @@ bool compare_tokens(Token a, Token b) {
     return false;
 }
 
+// Eat the comp operator
 void tokenize_comp_operator(Token* tk, char** src){
     if (strncmp(*src, "==", 2) == 0){
         tk->type = TK_EQ;
@@ -159,11 +185,14 @@ void tokenize_comp_operator(Token* tk, char** src){
     (*src) += 2;
 }
 
+// tokenize and load into the buffer
+//
+// aborts if the input is not valid
 void tokenize(TokenList* tk, char* src) {
     char* absolute_start = src;
     global_start_of_file = src;
     char* start = src;
-    skip_whitespace(&src);
+    skip_whitespace_comments(&src);
     while (*src){
         start = src;
         Token tmp = {
@@ -186,23 +215,7 @@ void tokenize(TokenList* tk, char* src) {
                 break;
             case '/':
                 src++;
-                if (*src == '/') {
-                    while (*src && *src != '\n'){
-                        src++;
-                        printf("%c", *src);
-                    }
-                    skip_whitespace(&src);
-                    continue;
-                } else if (*src == '*') {
-                    while (*src && (*src != '*' || *(src + 1) != '/')){
-                        src++;
-                    }
-                    src += 2;
-                    skip_whitespace(&src);
-                    continue;
-                } else {
-                    tmp.type = TK_DIV;
-                }
+                tmp.type = TK_DIV;
                 break;
             case '(':
                 src++;
@@ -235,6 +248,7 @@ void tokenize(TokenList* tk, char* src) {
                 tokenize_comp_operator(&tmp, &src);
                 break;
             default:
+                // KEYWORDS
                 if (isdigit((int) *src)){
                     tokenize_num(&tmp, &src);
                 } else if (strncmp(src, "return", 3) == 0) {
@@ -253,6 +267,18 @@ void tokenize(TokenList* tk, char* src) {
                     src += 5;
                     tmp.type = TK_TYPE_KEYWORD;
                     tmp.data.type = ty_float;
+                } else if (strncmp(src, "if", 2) == 0) {
+                    src += 2;
+                    tmp.type = TK_IF;
+                } else if (strncmp(src, "else", 4) == 0) {
+                    src += 4;
+                    tmp.type = TK_ELSE;
+                } else if (strncmp(src, "while", 5) == 0) {
+                    src += 5;
+                    tmp.type = TK_WHILE;
+                } else if (strncmp(src, "for", 3) == 0) {
+                    src += 3;
+                    tmp.type = TK_FOR;
                 } else {
                     char* buff;
                     int i = 0;
@@ -277,7 +303,7 @@ void tokenize(TokenList* tk, char* src) {
                 }
         }
         arrput(tk->data, tmp);
-        skip_whitespace(&src);
+        skip_whitespace_comments(&src);
     }
     Token eof = {
         TK_EOF,

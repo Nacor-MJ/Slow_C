@@ -17,6 +17,9 @@ static void inline __attribute__((noreturn)) fuck(int i, const char* a, int b) {
     exit(0);
 };
 #define my_exit(i) fuck(i, __FILE__, __LINE__);
+#define NOT_IMPLEMENTED \
+    printf("\033[31mFunction %s not implemented\033[0m\n", __FUNCTION__);\
+    fuck(69, __FILE__, __LINE__);
 
 typedef struct Expr Expr;
 typedef struct Statement Statement;
@@ -93,8 +96,8 @@ typedef enum {
     TK_IDENT,
     TK_LPAREN,
     TK_RPAREN,
-    TK_LCURLY,
-    TK_RCURLY,
+    TK_LCURLY, // {
+    TK_RCURLY, // }
     TK_EQ, // ==
     TK_NE, // !=
     TK_MT, // >
@@ -106,7 +109,11 @@ typedef enum {
     TK_COMMA,
     TK_TYPE_KEYWORD,
     TK_RETURN,
-    TK_COMMENT
+    TK_COMMENT,
+    TK_IF,
+    TK_ELSE,
+    TK_WHILE,
+    TK_FOR,
 } TokenType;
 typedef union {
     // If you add anything here implement compare_tokens for it
@@ -121,14 +128,14 @@ typedef struct {
     char* start_of_token;
 } Token;
 
-typedef struct { 
+typedef struct {
     Token* data;
     int pars_ptr;
 } TokenList;
 
 void print_error_tok(Token*, char*);
-Token* eat_token(TokenList* tk, TokenType check);
-Token* consume_token(TokenList* tk);
+Token* eat_token_checked(TokenList* tk, TokenType check);
+Token* eat_token(TokenList* tk);
 Token* next_token(TokenList* tk);
 Token* next_token_with_offset(TokenList* tk, int offset);
 void printTokens(TokenList* t);
@@ -164,6 +171,7 @@ typedef struct Scope Scope;
 typedef struct Scope {
     Variable* variables;
     Scope* parent;
+    int depth;
 } Scope;
 
 typedef Expr* ExprList;
@@ -171,6 +179,7 @@ typedef struct StmtList {
     Statement* data;
     Scope* scope;
 } StmtList;
+
 StmtList new_stmt_list(Scope* );
 
 typedef StmtList Program;
@@ -187,23 +196,34 @@ typedef struct {
     ExprList args;
 } FunctionCall;
 typedef struct {
-    char* name;
-} VariableIdent;
+    union {
+        int integer;
+        float floating;
+        char character;
+        char* string;
+    };
+    enum {
+        CONST_INT,
+        CONST_FLOAT,
+        CONST_CHAR,
+        CONST_STRING
+    } kind;
+} ConstVal;
 
 typedef union {
-    int integer;
-    float floating;
-    VariableIdent variable_ident;
+    ConstVal constant;
+    Variable* variable_ident;
     FunctionCall function_call;
     BinExpr* bin_expr;
 } ExprVal;
 typedef enum {
     EMPTY_EXPR,
-    VAL,
+    EXPR_CONSTANT,
     VARIABLE_IDENT,
     FUNCTION_CALL,
     BIN_EXPR
 } ExprVar;
+// TODO: get rid of ExprVal with anonymous union
 typedef struct Expr {
     ExprVar var;
     ExprVal val;
@@ -211,46 +231,55 @@ typedef struct Expr {
     Type* type;
 } Expr;
 
-
 typedef struct {
-    Type* type;
-    char* name;
+    Variable* type;
     StmtList args;
     StmtList body;
 } FunctionDefinition;
 typedef struct {
     Type* type;
     Expr val;
-    VariableIdent vi;
+    Variable* ident;
 } VariableAssignment;
 typedef struct Conditional_jump {
     Expr* condition;
-    Expr* true_block;
-    Expr* false_block;
-    Expr* next;
-} Conditional_jump;
+    Statement* then_block;
+    Statement* else_block;
+} ConditionalJump;
+typedef struct Loop {
+    Expr* condition;
+    Statement* init;
+    Statement* increment;
+    Statement* body;
+    enum {
+        DO_WHILE,
+        WHILE,
+        FOR
+    } kind;
+} Loop;
 
-typedef union StmtVal {
-    VariableAssignment variable_assignment;
-    FunctionDefinition function_definition;
-    Conditional_jump conditional_jump;
-    StmtList block;
-    Program program;
-    Expr return_;
-    Expr throw_away;
-} StmtVal;
 typedef enum StmtVar {
     STMT_VARIABLE_ASSIGNMENT,
     STMT_FUNCTION_DEFINITION,
     STMT_CONDITIONAL_JUMP,
+    STMT_LOOP,
     STMT_BLOCK,
     STMT_PROGRAM,
     STMT_RETURN,
-    STMT_THROWAWAY
+    STMT_THROW_AWAY
 } StmtVar;
 typedef struct Statement {
     StmtVar var;
-    StmtVal val;
+    union StmtVal {
+        VariableAssignment variable_assignment;
+        FunctionDefinition function_definition;
+        ConditionalJump conditional_jump;
+        Loop loop;
+        StmtList block;
+        Program program;
+        Expr return_;
+        Expr throw_away;
+    };
     Token* start;
 } Statement;
 
@@ -281,10 +310,9 @@ void check_types(Type* t1, Type* t2, Token* tk);
 // scope.c
 //
 
-void add_variable(Scope* p, Token var, Type* type, int version);
-int increase_var_version(Scope* p, Token var);
+Variable* add_variable(Scope* p, Token var, Type* type);
 Type* get_var_type(Scope* p, Token var);
-int get_var_version(Scope* p, Token var);
+Variable* get_variable(Scope* p, char* ident);
 
 Scope* new_scope(Scope* parent);
 void deinit_scope(Scope* s);
@@ -305,17 +333,6 @@ Type* get_expr_type(Expr*);
 
 void post_processing(Program* root);
 
-//
-// print.c
-//
-
-const char* type_to_string(Type*);
-void print_vars(Scope* p);
-void print_token(Token*);
-void print_type_keyword(Type*);
-void print_program(Program*, int);
-void print_statement(Statement*, int);
-void print_expr(Expr*, int);
 
 // 
 // free.c
@@ -334,4 +351,90 @@ void generate_asm(FILE* f, Program* program);
 // ir.c
 //
 
+typedef struct TAC TAC;
+
+// named labels are stored as variable 
+// and compiler generated ones are in temporary
+typedef struct Address {
+    union {
+        ConstVal constant;
+        Variable* variable;
+        int temporary;
+        TAC* label;
+    };
+    enum {
+        ADDR_CONSTANT,
+        ADDR_VARIABLE,
+        ADDR_TEMPORARY,
+        ADDR_LABEL
+    } kind;
+} Address;
+extern Address EMPTY_ADDRESS;
+
+typedef enum {
+    TAC_ADD,
+    TAC_SUB,
+    TAC_MUL,
+    TAC_DIV,
+
+    TAC_ASSIGN,
+
+    TAC_LABEL,
+
+    TAC_JMP,
+    TAC_IF_JMP,
+    TAC_IF_FALSE_JMP,
+
+    TAC_LE,
+    TAC_LT,
+    TAC_ME,
+    TAC_MT,
+    TAC_EQ,
+
+    TAC_CALL, 
+    TAC_PARAM,
+    TAC_RETURN,
+} TAC_OP;
+
+// Represents the Three address instruction
+//
+// result = arg1 op arg2
+// if arg1 op arg2 goto result
+// if arg1 goto result
+// ifFalse arg1 goto result
+// result: 
+// jmp result
+// result = arg1
+// param arg1
+// result = arg1() ; arg2 = number of params
+typedef struct TAC {
+    Address arg1; // param; assign, num of params for call
+    Address arg2;
+    Address result; // target of jumps; label
+    TAC_OP op;
+} TAC;
+
+typedef TAC* IR;
+typedef IR* IRList;
+
+IRList ast_to_tac(Program* program);
+
+void statement_to_ir(IR destination, Statement* st);
+Address expr_to_ir(IR destination, Expr* e);
+
+//
+// print.c
+//
+
+const char* type_to_string(Type*);
+void print_vars(Scope* p);
+void print_token(Token*);
+void print_type_keyword(Type*);
+void print_program(Program*, int);
+void print_statement(Statement*, int);
+void print_expr(Expr*, int);
+void print_address(Address*);
+void print_ir_list(IRList);
+void print_ir(IR ir);
+void print_tac(TAC* tac);
 #endif

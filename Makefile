@@ -1,4 +1,4 @@
-CFLAGS=-std=c11 -g3 -fno-common -Wall -Wno-switch
+CFLAGS=-std=c11 -g3 -fno-common -Wall -Wno-switch -Werror
 
 SRCS=$(filter-out idk.c, $(wildcard *.c))
 OBJS=$(SRCS:.c=.o)
@@ -8,6 +8,7 @@ OBJS=$(SRCS:.c=.o)
 Slow_C: $(OBJS)
 	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS) -g -lm
 	rm *.o
+	clear
 
 $(OBJS): slow_c.h
 
@@ -15,7 +16,7 @@ gdb: Slow_C
 	gdb -ex run --args ./Slow_C.exe idk.c
 
 test_idk: Slow_C
-	./Slow_C.exe idk.c 
+	./Slow_C.exe idk.c
 	-./idk.exe
 
 git:

@@ -2,7 +2,8 @@
 
 extern char* absolute_start;
 
-void add_variable(Scope* p, Token var, Type* type, int version) {
+// returns the pointer to the variable
+Variable* add_variable(Scope* p, Token var, Type* type) {
     char* identifier = var.data.ident;
     int idx = shgeti(p->variables, identifier);
     if (idx != -1) {
@@ -17,9 +18,12 @@ void add_variable(Scope* p, Token var, Type* type, int version) {
 
     shput(p->variables, tmp, type);
 
-    return;
+    return shgetp_null(p->variables, tmp);
 }
-Type* get_var_type(Scope* p, Token var){
+Variable* get_variable(Scope* p, char* ident) {
+    return shgetp_null(p->variables, ident);
+}
+Type* get_var_type(Scope* p, Token var) {
     int idx = shgeti(p->variables, var.data.ident);
     if (idx == -1) {
         if (p->parent != NULL) {
@@ -39,9 +43,15 @@ Scope* new_scope(Scope* parent) {
 
     Variable* vars = NULL;
 
+    int depth = 0;
+    if (parent != NULL) {
+        depth = parent->depth + 1;
+    }
+
     *result = (Scope) {
         vars,
-        parent
+        parent,
+        depth
     };
     return result;
 }
@@ -50,6 +60,7 @@ void deinit_scope(Scope* s) {
     free(s);
 }
 
+// Creates an empty StmtList with p as its parent scope
 StmtList new_stmt_list(Scope* p) {
     Scope* subscope = new_scope(p);
     StmtList result = {

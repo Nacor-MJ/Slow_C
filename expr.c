@@ -4,7 +4,7 @@ extern char* absolute_start;
 
 Expr zero_expr(Token* start) {
     ExprVal ev;
-    ev.integer = 0;
+    ev.constant = (ConstVal) {{0}, CONST_INT};
     Expr e = {
         EMPTY_EXPR,
         ev,
@@ -31,13 +31,13 @@ void parse_expr_list(Scope* p, TokenList* tk, ExprList* list) {
         Expr nd = parse_expr(p, tk);
         append_expr(list, nd);
         if (next_token(tk)->type == TK_COMMA) {
-            consume_token(tk);
+            eat_token(tk);
         }
     }
 }
 
 Expr parse_function_call(Scope* p, TokenList* tk) {
-    Token* var = eat_token(tk, TK_IDENT);
+    Token* var = eat_token_checked(tk, TK_IDENT);
     ExprVal nv;
 
     nv.function_call.name = var->data.ident;
@@ -47,11 +47,11 @@ Expr parse_function_call(Scope* p, TokenList* tk) {
 
     nv.function_call.args = NULL;
 
-    eat_token(tk, TK_LPAREN);
+    eat_token_checked(tk, TK_LPAREN);
 
     parse_expr_list(p, tk, &nv.function_call.args);
 
-    eat_token(tk, TK_RPAREN);
+    eat_token_checked(tk, TK_RPAREN);
 
     Expr nd = {
         FUNCTION_CALL,
@@ -67,51 +67,57 @@ Expr parse_factor(Scope* p, TokenList* tk){
     Token* start = next;
 
     if (next->type == TK_MINUS){
-        consume_token(tk);
+        eat_token(tk);
         Token* negated = next_token(tk);
         negated->data.integer *= -1;
         next = next_token(tk);
     } else if (next->type == TK_PLUS){
-        consume_token(tk);
+        eat_token(tk);
         next = next_token(tk);
     }
 
     if (next->type == TK_INT){
-        eat_token(tk, TK_INT);
+        eat_token_checked(tk, TK_INT);
         ExprVal nv;
-        nv.integer = next->data.integer;
+        nv.constant = (ConstVal) {
+            {next->data.integer},
+            CONST_INT
+        };
         Expr nd = {
-            VAL,
+            EXPR_CONSTANT,
             nv,
             start,
             ty_int
         };
         return nd;
     } else if (next->type == TK_FLOAT) {
-        eat_token(tk, TK_FLOAT);
+        eat_token_checked(tk, TK_FLOAT);
         ExprVal nv;
-        nv.floating = next->data.floating;
+        nv.constant = (ConstVal) {
+            {next->data.floating},
+            CONST_FLOAT
+        };
         Expr nd = {
-            VAL,
+            EXPR_CONSTANT,
             nv,
             start,
             ty_int
         };
         return nd;
     } else if (next->type == TK_LPAREN){
-        eat_token(tk, TK_LPAREN);
+        eat_token_checked(tk, TK_LPAREN);
         Expr result = parse_expr(p, tk);
-        eat_token(tk, TK_RPAREN);
+        eat_token_checked(tk, TK_RPAREN);
         return result;
     } else if (next->type == TK_IDENT) {
         if (next_token_with_offset(tk, 1)->type == TK_LPAREN) {
             return parse_function_call(p, tk);
         }
 
-        Token* name = consume_token(tk);
-        
+        Token* name = eat_token(tk);
+
         ExprVal ndata;
-        ndata.variable_ident.name = name->data.ident;
+        ndata.variable_ident= get_variable(p, name->data.ident);
         Expr nd = {
             VARIABLE_IDENT,
             ndata,
@@ -119,7 +125,6 @@ Expr parse_factor(Scope* p, TokenList* tk){
             get_var_type(p, *name)
         };
         return nd;
-
     } else {
         printf("Expected factor, got ");
         print_error_tok(next, absolute_start);
@@ -152,7 +157,7 @@ Expr parse_term(Scope* p, TokenList* tk){
                 my_exit(-1);
         }
 
-        consume_token(tk);
+        eat_token(tk);
         assign_r_to_BinExpr(&result, parse_factor(p, tk));
 
         ExprVal nv;
@@ -178,7 +183,7 @@ Expr parse_bin_expr(Scope* p, TokenList* tk){
 
     if (next_token(tk)->type == TK_PLUS || next_token(tk)->type == TK_MINUS){
         
-        Token* op = consume_token(tk);
+        Token* op = eat_token(tk);
 
         BinExpr result = {
             NULL,
@@ -232,7 +237,7 @@ Expr parse_relational_expr(Scope* p, TokenList* tk){
         next_token(tk)->type == TK_LE
     ){
         
-        Token* op = consume_token(tk);
+        Token* op = eat_token(tk);
 
         BinExpr result = {
             NULL,
@@ -287,7 +292,7 @@ Expr parse_eq_ne(Scope* p, TokenList* tk){
         next_token(tk)->type == TK_NE
     ){
         
-        Token* op = consume_token(tk);
+        Token* op = eat_token(tk);
 
         BinExpr result = {
             NULL,
@@ -341,7 +346,7 @@ Type* get_expr_type(Expr* e){
         case BIN_EXPR:
             tp = get_expr_type(e->val.bin_expr->l);
             break;
-        case VAL:
+        case EXPR_CONSTANT:
             tp = ty_int;
             break;
         default:
