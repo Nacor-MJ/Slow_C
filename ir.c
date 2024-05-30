@@ -115,7 +115,7 @@ Address expr_to_ir(IR destination, Expr* e) {
             break;
         case VARIABLE_IDENT:
             result.variable = e->val.variable_ident;
-            result.kind = ADDR_CONSTANT;
+            result.kind = ADDR_VARIABLE;
             break;
         case BIN_EXPR:
             BinExpr* b = e->val.bin_expr;
@@ -146,8 +146,46 @@ void block_to_ir(IR destination, StmtList block) {
     }
 }
 
-void loop_to_ir(IR destination, Loop l) {
-    NOT_IMPLEMENTED
+void while_loop_to_ir(IR destination, Loop* l) {
+    Address loop_back = new_loop_label(destination);
+
+    Address condition = expr_to_ir(destination, l->condition);
+
+    TAC tmp = {
+        condition,
+        EMPTY_ADDRESS,
+        EMPTY_ADDRESS,
+        TAC_IF_FALSE_JMP
+    };
+    arrput(destination, tmp);
+    TAC* jump_over = get_last_tac(destination);
+
+
+    statement_to_ir(destination, l->body);
+
+    TAC goto_jmp = (TAC) {
+        EMPTY_ADDRESS,
+        EMPTY_ADDRESS,
+        loop_back,
+        TAC_JMP
+    };
+    arrput(destination, goto_jmp);
+
+    jump_over->result = new_loop_label(destination);
+}
+
+void loop_to_ir(IR destination, Loop* l) {
+    switch (l->kind) {
+        case WHILE:
+            while_loop_to_ir(destination, l);
+            break;
+        case FOR:
+            NOT_IMPLEMENTED;
+            break;
+        case DO_WHILE:
+            NOT_IMPLEMENTED;
+            break;
+    }
 }
 
 void conditional_jump_to_ir(IR destination, ConditionalJump* c) {
@@ -162,6 +200,10 @@ void conditional_jump_to_ir(IR destination, ConditionalJump* c) {
     arrput(destination, tmp);
 
     TAC* jump_over = get_last_tac(destination);
+
+    if (c->else_block != NULL) {
+        NOT_IMPLEMENTED;
+    }
 
     statement_to_ir(destination, c->then_block);
 
@@ -200,7 +242,7 @@ void statement_to_ir(IR destination, Statement* st) {
             );
             break;
         case STMT_LOOP:
-            loop_to_ir(destination, st->loop);
+            loop_to_ir(destination, &st->loop);
             break;
         case STMT_BLOCK:
             block_to_ir(destination, st->block);

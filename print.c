@@ -120,14 +120,12 @@ void print_statement(Statement* stmt, int indent) {
                 printf("while ( ");
                 print_expr(l.condition, indent);
                 printf(" ) ");
-                print_statement(l.body, indent);
                 break;
             case FOR:
                 printf("for ( ");
                 print_statement(l.init, indent); puts("; ");
                 print_expr(l.condition, indent); puts("; ");
                 print_statement(l.increment, indent); puts(" )");
-                print_statement(l.body, indent);
                 break;
             case DO_WHILE:
                 puts("do ");
@@ -135,7 +133,7 @@ void print_statement(Statement* stmt, int indent) {
                 puts(" while ( ");
                 print_expr(l.condition, indent);
                 puts(" );");
-        } // for (int i = 0; i>5; i++)
+        }
         print_statement(l.body, indent);
     } else {
         printf("print_statement not implemented for: %d\n", stmt->var);
@@ -346,7 +344,6 @@ void print_address(Address* a) {
             break;
         case ADDR_LABEL:
             print_address(&a->label->result);
-            printf(":\n");
             break;
         default:
             printf("Unknown");
@@ -403,6 +400,12 @@ void print_tac_op(TAC_OP tac_op) {
         case TAC_RETURN:
             strcpy(op, "return");
             break;
+        case TAC_EQ:
+            strcpy(op, "==");
+            break;
+        case TAC_NE:
+            strcpy(op, "!=");
+            break;
         default:
             sprintf(op, "%d", tac_op);
     }
@@ -410,6 +413,7 @@ void print_tac_op(TAC_OP tac_op) {
 }
 
 void print_tac(TAC* tac) {
+    // if this thing is a label for the function call
     if (tac->op != TAC_LABEL || tac->result.kind != ADDR_VARIABLE) {
         printf("    ");
     }

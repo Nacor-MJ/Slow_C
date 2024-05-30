@@ -18,8 +18,8 @@ static void inline __attribute__((noreturn)) fuck(int i, const char* a, int b) {
 };
 #define my_exit(i) fuck(i, __FILE__, __LINE__);
 #define NOT_IMPLEMENTED \
-    printf("\033[31mFunction %s not implemented\033[0m\n", __FUNCTION__);\
-    fuck(69, __FILE__, __LINE__);
+    printf("\033[31mIn function %s not implemented\033[0m\n", __FUNCTION__);\
+    fuck(69, __FILE__, __LINE__)
 
 typedef struct Expr Expr;
 typedef struct Statement Statement;
@@ -371,6 +371,8 @@ typedef struct Address {
 } Address;
 extern Address EMPTY_ADDRESS;
 
+// Three address code type
+//  binops, assign, label, jumps, call, params 
 typedef enum {
     TAC_ADD,
     TAC_SUB,
@@ -389,6 +391,7 @@ typedef enum {
     TAC_LT,
     TAC_ME,
     TAC_MT,
+    TAC_NE,
     TAC_EQ,
 
     TAC_CALL, 

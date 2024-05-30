@@ -132,6 +132,27 @@ Statement parse_if_statement(Scope * p, TokenList* tk) {
     return (Statement) { STMT_CONDITIONAL_JUMP, .conditional_jump = l};
 }
 
+
+Statement parse_while_statement(Scope * p, TokenList* tk) {
+    eat_token_checked(tk, TK_WHILE);
+    eat_token_checked(tk, TK_LPAREN);
+
+    Expr* cond = (Expr*) malloc(sizeof(Expr));
+    if (cond == NULL) my_exit(69);
+    *cond = parse_expr(p, tk);
+
+    eat_token_checked(tk, TK_RPAREN);
+
+    Statement* body = (Statement*) malloc(sizeof(Statement)); 
+    if (body == NULL) my_exit(69);
+    *body = parse_statement(p, tk);
+
+    if (next_token(tk)->type == TK_SEMICOLON) eat_token(tk);
+
+    Loop l = { cond, NULL, NULL, body, WHILE };
+    return (Statement) { STMT_LOOP, .loop = l};
+}
+
 Statement parse_statement(Scope* p, TokenList* tk) {
     while (
         next_token(tk)->type == TK_COMMENT ||
@@ -182,6 +203,8 @@ Statement parse_statement(Scope* p, TokenList* tk) {
         return rst;
     } else if (next->type == TK_IF) {
         return parse_if_statement(p, tk);
+    } else if (next->type == TK_WHILE) {
+        return parse_while_statement(p, tk);
     } else if (next->type == TK_LCURLY) {
         StmtList block = parse_block(p, tk);
         return (Statement) {
