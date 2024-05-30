@@ -87,12 +87,7 @@ Token* next_token(TokenList* tk) {
 
 // returns the token with offset,
 // offset 0 returns the same as Token* next_token(TokenList*)
-// we are doing bounds checking
 Token* next_token_with_offset(TokenList* tk, int offset) {
-    if (tk->pars_ptr + offset > arrlen(tk)) {
-        printf("\033[91mERROR: out of bounds\033[0m");
-        my_exit(-1);
-    }
     return &tk->data[tk->pars_ptr + offset];
 }
 
@@ -284,14 +279,14 @@ void tokenize(TokenList* tk, char* src) {
                     int i = 0;
                     if (isalpha((int) *src) == 0 || *src == '_'){
                         printf(
-                            "Not a valid identifier: '%c', hex: '%x' \n", 
-                            *src, 
+                            "Not a valid identifier: '%c', hex: '%x' \n",
+                            *src,
                             *src && 0xff
                         );
                         print_error_tok(&tmp, absolute_start);
                         my_exit(-1);
                     }
-                    while (isalpha((int) *src)){
+                    while (isalpha((int) *src) || isdigit((int) *src) || *src == '_') {
                         i++;
                         src++;
                     }

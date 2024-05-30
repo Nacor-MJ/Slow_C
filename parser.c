@@ -103,19 +103,20 @@ Statement parse_var_redeclaration(Scope* p, TokenList* tk) {
 // Parses if statement in these forms:
 // if (Expr) Statement
 // if (Expr) Statement else Statement
-Statement parse_if_statement(Scope * p, TokenList* tk) {
+Statement parse_if_statement(Scope * parent, TokenList* tk) {
+    Scope* subscope = new_scope(parent);
     eat_token_checked(tk, TK_IF);
     eat_token_checked(tk, TK_LPAREN);
 
     Expr* cond = (Expr*) malloc(sizeof(Expr));
     if (cond == NULL) my_exit(69);
-    *cond = parse_expr(p, tk);
+    *cond = parse_expr(parent, tk);
 
     eat_token_checked(tk, TK_RPAREN);
 
     Statement* if_body = (Statement*) malloc(sizeof(Statement)); 
     if (if_body == NULL) my_exit(69);
-    *if_body = parse_statement(p, tk);
+    *if_body = parse_statement(subscope, tk);
 
     Statement* else_body = NULL;
 
@@ -123,7 +124,7 @@ Statement parse_if_statement(Scope * p, TokenList* tk) {
         eat_token_checked(tk, TK_ELSE);
         else_body = (Statement*) malloc(sizeof(Statement));
         if (else_body == NULL) my_exit(69);
-        *else_body = parse_statement(p, tk);
+        *else_body = parse_statement(subscope, tk);
     }
 
     if (next_token(tk)->type == TK_SEMICOLON) eat_token(tk);
@@ -133,19 +134,21 @@ Statement parse_if_statement(Scope * p, TokenList* tk) {
 }
 
 
-Statement parse_while_statement(Scope * p, TokenList* tk) {
+Statement parse_while_statement(Scope * parent, TokenList* tk) {
+    Scope* subscope = new_scope(parent);
+
     eat_token_checked(tk, TK_WHILE);
     eat_token_checked(tk, TK_LPAREN);
 
     Expr* cond = (Expr*) malloc(sizeof(Expr));
     if (cond == NULL) my_exit(69);
-    *cond = parse_expr(p, tk);
+    *cond = parse_expr(parent, tk);
 
     eat_token_checked(tk, TK_RPAREN);
 
     Statement* body = (Statement*) malloc(sizeof(Statement)); 
     if (body == NULL) my_exit(69);
-    *body = parse_statement(p, tk);
+    *body = parse_statement(subscope, tk);
 
     if (next_token(tk)->type == TK_SEMICOLON) eat_token(tk);
 
@@ -155,8 +158,7 @@ Statement parse_while_statement(Scope * p, TokenList* tk) {
 
 Statement parse_statement(Scope* p, TokenList* tk) {
     while (
-        next_token(tk)->type == TK_COMMENT ||
-        next_token(tk)->type == TK_SEMICOLON
+        next_token(tk)->type == TK_COMMENT
     ) {
         eat_token(tk);
     }
@@ -210,6 +212,13 @@ Statement parse_statement(Scope* p, TokenList* tk) {
         return (Statement) {
             STMT_BLOCK,
             .block = block,
+            next
+        };
+    } else if (next->type == TK_SEMICOLON) {
+        eat_token_checked(tk, TK_SEMICOLON);
+        return (Statement) {
+            STMT_THROW_AWAY,
+            .throw_away = zero_expr(next),
             next
         };
     } else {

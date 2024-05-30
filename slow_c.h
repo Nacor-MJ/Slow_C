@@ -286,9 +286,6 @@ typedef struct Statement {
 void free_stmt_list(StmtList);
 Program parse(TokenList src);
 
-Scope* new_scope(Scope* parent);
-void deinit_scope();
-
 typedef struct Parser {
     Scope* global_scope;
     char* absolute_start;
@@ -422,8 +419,8 @@ typedef IR* IRList;
 
 IRList ast_to_tac(Program* program);
 
-void statement_to_ir(IR destination, Statement* st);
-Address expr_to_ir(IR destination, Expr* e);
+void statement_to_ir(IR* destination, Statement* st);
+Address expr_to_ir(IR* destination, Expr* e);
 
 //
 // print.c

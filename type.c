@@ -3,7 +3,7 @@
 #ifndef TYPE_C
 #define TYPE_C
 
-const TypeData td_none = {0};
+#define td_none {0}
 Type* ty_none = &(Type){TY_NONE, 0, 0, td_none};
 
 Type *ty_void = &(Type){TY_VOID, 1, 1, td_none};

@@ -26,10 +26,15 @@ void test_idk() {
 char* load_file(char const* path) {
     char* buffer = 0;
     long length;
+    #ifndef _WIN64
+    FILE * f = fopen(path, "rb");
+    strcpy(current_file, path);
+    #else
     FILE * f = NULL;
     fopen_s(&f, path, "rb"); // I have no clue why i need the b in there but without it it just breaks :)
-
     strcpy_s(current_file, strlen(path), path);
+    #endif
+
 
     if (f)
     {
@@ -66,11 +71,15 @@ int main(int argc, char *argv[]) {
 
 
     char file_path[strlen(file_path_with_extenstion) - 2];
+    #ifndef _WIN64
+    strcpy(file_path, file_path_with_extenstion);
+    #else
     strcpy_s(
         file_path,
         strlen(file_path_with_extenstion) - 2, 
         file_path_with_extenstion
     );
+    #endif
     file_path[strlen(file_path_with_extenstion) - 2] = '\0';
 
     // ------------ Tokenize --------------
@@ -89,7 +98,7 @@ int main(int argc, char *argv[]) {
     // ----------- Generate IR ------------
     printf("\033[94mGenerating IR:\033[0m\n");
     IRList ir = ast_to_tac(&program);
-    print_ir_list(ir);
+    // print_ir_list(ir);
 
     // ---------- Convert to ASM ----------
     printf("\033[94mGenerating ASM:\033[0m\n");
@@ -111,10 +120,15 @@ int main(int argc, char *argv[]) {
     free(asm_file_command);
 
     // ---------- Cleanup ----------
-    free_token_list_and_data(&tokens);
     free_program(program);
     free(buff);
+
+    for (int i = 0; arrlen(ir) > i; i++) {
+        IR tac = ir[i];
+        arrfree(tac);
+    }
     arrfree(ir);
+    free_token_list_and_data(&tokens);
 
     // test_idk();
 

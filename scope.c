@@ -12,13 +12,11 @@ Variable* add_variable(Scope* p, Token var, Type* type) {
         my_exit(-1);
     }
 
-    char* tmp = malloc(strlen(var.data.ident) + 1);
-    if (tmp == NULL) my_exit(69);
-    strcpy(tmp, var.data.ident);
+    shput(p->variables, var.data.ident, type);
 
-    shput(p->variables, tmp, type);
+    Variable* result = shgetp_null(p->variables, var.data.ident);  
 
-    return shgetp_null(p->variables, tmp);
+    return result;
 }
 Variable* get_variable(Scope* p, char* ident) {
     return shgetp_null(p->variables, ident);
@@ -54,10 +52,6 @@ Scope* new_scope(Scope* parent) {
         depth
     };
     return result;
-}
-void deinit_scope(Scope* s) {
-    shfree(s->variables);
-    free(s);
 }
 
 // Creates an empty StmtList with p as its parent scope

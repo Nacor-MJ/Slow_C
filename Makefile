@@ -1,4 +1,4 @@
-CFLAGS=-std=c11 -g3 -fno-common -Wall -Wno-switch -Werror
+CFLAGS=-std=c11 -g3 -fno-common -Wall -Wno-switch -Werror -fms-extensions
 
 SRCS=$(filter-out idk.c, $(wildcard *.c))
 OBJS=$(SRCS:.c=.o)

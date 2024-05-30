@@ -21,13 +21,14 @@ TAC label_to_tac(Variable* var) {
     return t;
 }
 
-TAC* get_last_tac(IR destination) {
+TAC* get_last_tac(IR* destination) {
     return (TAC*) (
-        destination + arrlen(destination) - 1
+        *destination + arrlen(*destination) - 1
     );
 }
 
-Address new_loop_label(IR destination) {
+Address new_loop_label(IR* destination) {
+    IR dest = *destination;
     Address label = {
         .temporary = - (loop_label_count++),
         ADDR_TEMPORARY
@@ -38,12 +39,16 @@ Address new_loop_label(IR destination) {
         label,
         TAC_LABEL
     };
-    arrput(destination, tac);
+    arrput(dest, tac);
 
-    return (Address) {
-        .label = get_last_tac(destination),
+    Address a = {
+        .label = get_last_tac(&dest),
         ADDR_LABEL
     };
+
+    *destination = dest;
+
+    return a;
 }
 
 TAC_OP binop_to_tacop(Binop b) {
@@ -91,21 +96,25 @@ TAC_OP binop_to_tacop(Binop b) {
     return t;
 }
 
-Address bin_expr_to_ir(IR destination, BinExpr* b) {
-    Address l_a = expr_to_ir(destination, b->l);
-    Address r_a = expr_to_ir(destination, b->r);
+Address bin_expr_to_ir(IR* destination, BinExpr* b) {
+    IR dest = *destination;
+    Address l_a = expr_to_ir(&dest, b->l);
+    Address r_a = expr_to_ir(&dest, b->r);
 
     Address temporary = new_temporary();
 
     TAC_OP op = binop_to_tacop(b->op);
 
     TAC tac = { l_a, r_a, temporary, op };
-    arrput(destination, tac);
+    arrput(dest, tac);
+
+    *destination = dest;
 
     return temporary;
 }
 
-Address expr_to_ir(IR destination, Expr* e) {
+Address expr_to_ir(IR* destination, Expr* e) {
+    IR dest = *destination;
     Address result = EMPTY_ADDRESS;
 
     switch (e->var) {
@@ -119,7 +128,7 @@ Address expr_to_ir(IR destination, Expr* e) {
             break;
         case BIN_EXPR:
             BinExpr* b = e->val.bin_expr;
-            result = bin_expr_to_ir(destination, b);
+            result = bin_expr_to_ir(&dest, b);
             break;
         case EMPTY_EXPR:
             printf("EMTPY_EXPR shouldn't get here\n");
@@ -129,27 +138,35 @@ Address expr_to_ir(IR destination, Expr* e) {
             printf("expr_to_ir not implemented for %d\n", e->var);
             my_exit(69);
     }
+
+    *destination = dest;
     return result;
 }
 
-void throwaway_to_ir(IR destination, Expr e) {
-
+void throwaway_to_ir(IR* destination, Expr e) {
+    IR dest = *destination;
+    *destination = dest;    
 }
 
-void return_to_ir(IR destination, Expr e) {
-
+void return_to_ir(IR* destination, Expr e) {
+    IR dest = *destination;
+    *destination = dest;    
 }
 
-void block_to_ir(IR destination, StmtList block) {
+void block_to_ir(IR* destination, StmtList block) {
+    IR dest = *destination;
     for (int i = 0; i < arrlen(block.data); i++) {
-        statement_to_ir(destination, &block.data[i]);
+        statement_to_ir(&dest, &block.data[i]);
     }
+    *destination = dest;
 }
 
-void while_loop_to_ir(IR destination, Loop* l) {
-    Address loop_back = new_loop_label(destination);
+void while_loop_to_ir(IR* destination, Loop* l) {
+    IR dest = *destination;
 
-    Address condition = expr_to_ir(destination, l->condition);
+    Address loop_back = new_loop_label(&dest);
+
+    Address condition = expr_to_ir(&dest, l->condition);
 
     TAC tmp = {
         condition,
@@ -157,11 +174,11 @@ void while_loop_to_ir(IR destination, Loop* l) {
         EMPTY_ADDRESS,
         TAC_IF_FALSE_JMP
     };
-    arrput(destination, tmp);
-    TAC* jump_over = get_last_tac(destination);
+    arrput(dest, tmp);
+    TAC* jump_over = get_last_tac(&dest);
 
 
-    statement_to_ir(destination, l->body);
+    statement_to_ir(&dest, l->body);
 
     TAC goto_jmp = (TAC) {
         EMPTY_ADDRESS,
@@ -169,15 +186,18 @@ void while_loop_to_ir(IR destination, Loop* l) {
         loop_back,
         TAC_JMP
     };
-    arrput(destination, goto_jmp);
+    arrput(dest, goto_jmp);
 
-    jump_over->result = new_loop_label(destination);
+    jump_over->result = new_loop_label(&dest);
+
+    *destination = dest;
 }
 
-void loop_to_ir(IR destination, Loop* l) {
+void loop_to_ir(IR* destination, Loop* l) {
+    IR dest = *destination;
     switch (l->kind) {
         case WHILE:
-            while_loop_to_ir(destination, l);
+            while_loop_to_ir(&dest, l);
             break;
         case FOR:
             NOT_IMPLEMENTED;
@@ -186,10 +206,13 @@ void loop_to_ir(IR destination, Loop* l) {
             NOT_IMPLEMENTED;
             break;
     }
+
+    *destination = dest;
 }
 
-void conditional_jump_to_ir(IR destination, ConditionalJump* c) {
-    Address condition = expr_to_ir(destination, c->condition);
+void conditional_jump_to_ir(IR* destination, ConditionalJump* c) {
+    IR dest = *destination;
+    Address condition = expr_to_ir(&dest, c->condition);
 
     TAC tmp = {
         condition,
@@ -197,23 +220,27 @@ void conditional_jump_to_ir(IR destination, ConditionalJump* c) {
         EMPTY_ADDRESS,
         TAC_IF_FALSE_JMP
     };
-    arrput(destination, tmp);
+    arrput(dest, tmp);
 
-    TAC* jump_over = get_last_tac(destination);
+    TAC* jump_over = get_last_tac(&dest);
 
     if (c->else_block != NULL) {
         NOT_IMPLEMENTED;
     }
 
-    statement_to_ir(destination, c->then_block);
+    statement_to_ir(&dest, c->then_block);
 
-    Address jump_over_label = new_loop_label(destination);
+    Address jump_over_label = new_loop_label(&dest);
     jump_over->result = jump_over_label;
+
+    *destination = dest;
 }
 
-void variable_assignment_to_ir(IR destination, VariableAssignment* va) {
+void variable_assignment_to_ir(IR* destination, VariableAssignment* va) {
+    IR dest = *destination;
+
     if (va->val.var == EMPTY_EXPR) return;
-    Address a = expr_to_ir(destination, &va->val);
+    Address a = expr_to_ir(&dest, &va->val);
     Address result = {
         .variable = va->ident,
         ADDR_VARIABLE
@@ -224,40 +251,45 @@ void variable_assignment_to_ir(IR destination, VariableAssignment* va) {
         result,
         TAC_ASSIGN
     };
-    arrput(destination, instr);
+    arrput(dest, instr);
+
+    *destination = dest;
 }
 
-void statement_to_ir(IR destination, Statement* st) {
+void statement_to_ir(IR* destination, Statement* st) {
+    IR dest = *destination;
     switch (st->var) {
         case STMT_VARIABLE_ASSIGNMENT:
             variable_assignment_to_ir(
-                destination, 
+                &dest, 
                 &st->variable_assignment
             );
             break;
         case STMT_CONDITIONAL_JUMP:
             conditional_jump_to_ir(
-                destination, 
+                &dest, 
                 &st->conditional_jump
             );
             break;
         case STMT_LOOP:
-            loop_to_ir(destination, &st->loop);
+            loop_to_ir(&dest, &st->loop);
             break;
         case STMT_BLOCK:
-            block_to_ir(destination, st->block);
+            block_to_ir(&dest, st->block);
             break;
         case STMT_RETURN:
-            return_to_ir(destination, st->return_);
+            return_to_ir(&dest, st->return_);
             break;
         case STMT_THROW_AWAY:
-            throwaway_to_ir(destination, st->throw_away);
+            throwaway_to_ir(&dest, st->throw_away);
             break;
         default:
             printf("I think it's literally imposible to get here but yeah");
             my_exit(69);
             break;
     }
+
+    *destination = dest;
 }
 
 // Function Definition to an Array of Three adress codes
@@ -269,7 +301,7 @@ IR function_definition_to_tac(FunctionDefinition* fd) {
 
     for (int i = 0; i < arrlen(fd->body.data); i++) {
         Statement st = fd->body.data[i];
-        statement_to_ir(function_ir, &st);
+        statement_to_ir(&function_ir, &st);
     }
 
     return function_ir;

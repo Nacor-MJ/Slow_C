@@ -1,6 +1,12 @@
 #include "slow_c.h"
 
 void free_token_list_and_data(TokenList* list) {
+    for (int i = 0; arrlen(list->data) > i; i++) {
+        Token tk = list->data[i];
+        if (tk.type == TK_IDENT) {
+            free(tk.data.ident);
+        };
+    }
     arrfree(list->data);
 }
 
@@ -16,14 +22,26 @@ void free_expr_list(ExprList list) {
     arrfree(list);
 }
 
-void free_stmt_list(StmtList list) {
+void deinit_scope(Scope* s) {
+    if (s->variables != NULL) shfree(s->variables);
+    if (s != NULL) free(s);
+}
+
+void free_stmt_list_not_scope(StmtList list) {
     for (int i = 0; arrlen(list.data) > i; i++) {
         free_statement_children(&list.data[i]);
     }
     arrfree(list.data);
 }
+void free_stmt_list(StmtList list) {
+    free_stmt_list_not_scope(list);
+    // FIXME: honestly what in the jesus is this shit
+
+    deinit_scope(list.scope);
+}
 
 void free_statement_children(Statement* st) {
+    if (st == NULL) return;
     if (
         st->var == STMT_THROW_AWAY ||
         st->var == STMT_RETURN
@@ -36,8 +54,8 @@ void free_statement_children(Statement* st) {
         free_stmt_list(st->block);
     } else if (st->var == STMT_FUNCTION_DEFINITION) {
         FunctionDefinition* fd = &st->function_definition;
-        free_stmt_list(fd->body);
         free_stmt_list(fd->args);
+        free_stmt_list_not_scope(fd->body);
     } else if (st->var == STMT_CONDITIONAL_JUMP) {
         ConditionalJump* cj = &st->conditional_jump;
         free_expr_children(cj->condition);
@@ -45,8 +63,8 @@ void free_statement_children(Statement* st) {
         free_statement_children(cj->else_block);
     } else if (st->var == STMT_LOOP) {
         Loop* l = &st->loop;
-        free_expr_children(l->condition);
-        free_statement_children(l->body);
+        free_expr_children(l->condition); free(l->condition);
+        free_statement_children(l->body); free(l->body);
         free_statement_children(l->increment);
         free_statement_children(l->init);
     } else {
@@ -72,7 +90,7 @@ void free_expr_children(Expr* nd){
             free_expr_children(be->r);
             free(be->r);
         }
-        free(be); // This is good <3
+        free(be);
     } else if (var == VARIABLE_IDENT) {
         // pass
     } else if (var == EXPR_CONSTANT ) {

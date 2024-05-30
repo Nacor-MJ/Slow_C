@@ -188,6 +188,8 @@ void print_expr(Expr *expr, int indent) {
     } else if (var == VARIABLE_IDENT) {
         Variable* vi = expr->val.variable_ident;
         printf("%s", vi->key);
+    } else if (var == EMPTY_EXPR) {
+        // pass
     } else {
         print_indent(indent, "");
         printf("\nprint_expr not implemented for: %d\n", expr->var);
