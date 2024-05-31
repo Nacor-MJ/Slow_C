@@ -114,6 +114,7 @@ typedef enum {
     TK_ELSE,
     TK_WHILE,
     TK_FOR,
+    TK_INCLUDE
 } TokenType;
 typedef union {
     // If you add anything here implement compare_tokens for it
@@ -138,9 +139,8 @@ Token* eat_token_checked(TokenList* tk, TokenType check);
 Token* eat_token(TokenList* tk);
 Token* next_token(TokenList* tk);
 Token* next_token_with_offset(TokenList* tk, int offset);
-void printTokens(TokenList* t);
+void print_tokens(TokenList* t);
 bool compare_tokens(Token a, Token b);
-void tokenize(TokenList* tk, char* src);
 
 //
 // parser.c
@@ -284,14 +284,13 @@ typedef struct Statement {
 } Statement;
 
 void free_stmt_list(StmtList);
-Program parse(TokenList src);
 
 typedef struct Parser {
-    Scope* global_scope;
+    Program program;
     char* absolute_start;
 } Parser;
 
-Program parse_program(Parser*, TokenList*);
+void parse_program(Parser*, TokenList*);
 StmtList parse_block(Scope* p, TokenList* tk);
 Statement parse_statement(Scope* p, TokenList* tk);
 
@@ -437,4 +436,8 @@ void print_address(Address*);
 void print_ir_list(IRList);
 void print_ir(IR ir);
 void print_tac(TAC* tac);
+
+void tokenize(TokenList* tk, char* src, Parser* parser);
+void compile_file_to_scope(Parser* parser, char const* path);
+void parse(Parser* parser, TokenList src);
 #endif

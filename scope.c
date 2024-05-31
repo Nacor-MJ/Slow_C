@@ -12,7 +12,11 @@ Variable* add_variable(Scope* p, Token var, Type* type) {
         my_exit(-1);
     }
 
-    shput(p->variables, var.data.ident, type);
+    char* tmp = (char*) malloc(strlen(var.data.ident) + 1);
+    if (tmp == NULL) my_exit(69);
+    strcpy(tmp, var.data.ident);
+
+    shput(p->variables, tmp, type);
 
     Variable* result = shgetp_null(p->variables, var.data.ident);  
 

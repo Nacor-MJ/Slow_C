@@ -302,7 +302,7 @@ void print_token(Token* t){
     }
 }
 
-void printTokens(TokenList* t) {
+void print_tokens(TokenList* t) {
     printf("\n");
     for (int i = 0; i < arrlen(t); i++) {
         print_token(&t->data[i]);

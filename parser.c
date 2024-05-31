@@ -298,10 +298,11 @@ StmtList parse_block(Scope* current_scope, TokenList* tk) {
 }
 
 // Parses the global scope
-Program parse_program(Parser* parser, TokenList* tk) {
-    Program result = {NULL, parser->global_scope};
+void parse_program(Parser* parser, TokenList* tk) {
+    Program result = parser->program;
 
     Statement next;
+    printf("next token type: %d\n", next_token(tk)->type);
     while (next_token(tk)->type != TK_EOF) {
         if ( next_token(tk)->type != TK_COMMENT &&
             next_token(tk)->type != TK_SEMICOLON &&
@@ -310,24 +311,24 @@ Program parse_program(Parser* parser, TokenList* tk) {
             print_error_tok(next_token(tk), absolute_start);
             my_exit(-1);
         }
-        next = parse_statement(parser->global_scope, tk);
+        next = parse_statement(parser->program.scope, tk);
 
         arrput(result.data, next);
     }
-    return result;
+    eat_token_checked(tk, TK_EOF);
+    parser->program = result;
 }
 
 // Entry point of parser.c
-Program parse(TokenList src){
-    Parser p;
-    p.global_scope = new_scope(NULL);
+void parse(Parser* parser, TokenList src){
+    char* save_start = absolute_start;
 
     src.pars_ptr = 0;
     absolute_start = next_token(&src)->start_of_token;
 
-    Program result = parse_program(&p, &src);
+    parse_program(parser, &src);
 
-    return result;
+    absolute_start = save_start;
 }
 
 #endif

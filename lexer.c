@@ -6,7 +6,7 @@
 
 char* global_start_of_file;
 
-extern char current_file[256];
+extern char current_file[256]; 
 
 // FIXME: this is a mess
 char* print_line(int line_num, char* line, int col_num) {
@@ -180,10 +180,14 @@ void tokenize_comp_operator(Token* tk, char** src){
     (*src) += 2;
 }
 
+void parse_include(char* path, Parser* parser) {
+    compile_file_to_scope(parser, path);
+}
+
 // tokenize and load into the buffer
 //
 // aborts if the input is not valid
-void tokenize(TokenList* tk, char* src) {
+void tokenize(TokenList* tk, char* src, Parser* parser) {
     char* absolute_start = src;
     global_start_of_file = src;
     char* start = src;
@@ -274,6 +278,24 @@ void tokenize(TokenList* tk, char* src) {
                 } else if (strncmp(src, "for", 3) == 0) {
                     src += 3;
                     tmp.type = TK_FOR;
+                } else if (strncmp(src, "#include", 8) == 0) {
+                    src += 8;
+                    while (*src == ' ') src++;
+                    if (*src != '<' && *src != '"') {
+                        printf("Not a valid include path\n");
+                        print_error_tok(&tmp, absolute_start);
+                        my_exit(-1);
+                    }
+                    src++;
+                    int start = 0;
+                    while (*(src + start) != '"' && *(src + start) != '>') start++;
+                    char* path = (char*) malloc(start + 1);
+                    strncpy(path, src, start);
+                    path[start] = '\0';
+                    src += start + 1;
+                    parse_include(path, parser);
+                    free(path);
+                    goto skip_put;
                 } else {
                     char* buff;
                     int i = 0;
@@ -293,11 +315,12 @@ void tokenize(TokenList* tk, char* src) {
                     buff = (char*) malloc(i + 1);
                     strncpy(buff, (src - i), i);
                     buff[i] = '\0';
-                   tmp.type = TK_IDENT;
+                    tmp.type = TK_IDENT;
                     tmp.data.ident = buff;
                 }
         }
         arrput(tk->data, tmp);
+    skip_put:
         skip_whitespace_comments(&src);
     }
     Token eof = {

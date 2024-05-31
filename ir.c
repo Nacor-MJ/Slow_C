@@ -296,6 +296,7 @@ void statement_to_ir(IR* destination, Statement* st) {
 //
 // the callee is responsible for cleanup
 IR function_definition_to_tac(FunctionDefinition* fd) {
+    if (fd->body.data == NULL) return NULL;
     IR function_ir = NULL;
     arrput(function_ir, label_to_tac(fd->type));
 

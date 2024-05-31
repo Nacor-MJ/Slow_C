@@ -26,15 +26,8 @@ void test_idk() {
 char* load_file(char const* path) {
     char* buffer = 0;
     long length;
-    #ifndef _WIN64
     FILE * f = fopen(path, "rb");
     strcpy(current_file, path);
-    #else
-    FILE * f = NULL;
-    fopen_s(&f, path, "rb"); // I have no clue why i need the b in there but without it it just breaks :)
-    strcpy_s(current_file, strlen(path), path);
-    #endif
-
 
     if (f)
     {
@@ -57,6 +50,38 @@ char* load_file(char const* path) {
     return buffer;
 }
 
+void compile_file_to_scope(Parser* parser, char const* path) {
+    printf("\033[94mCompiling %s\033[0m\n", path);
+
+    char save_current_file[256];
+    strncpy(save_current_file, current_file, 256);
+
+    char* buff = load_file(path);
+
+    char file_path[strlen(path) - 2];
+    strncpy(
+        file_path,
+        path,
+        strlen(path) - 2
+    );
+    file_path[strlen(path) - 2] = '\0';
+
+    // ------------ Tokenize --------------
+    TokenList tokens = { NULL, 0 };
+    tokenize(&tokens, buff, parser);
+
+    // ------------ Parse --------------
+
+    parse(parser, tokens);
+    printf("\033[94mParsed Program:\033[0m\n");
+    print_program(&parser->program, 0);
+
+    free(buff);
+    free_token_list_and_data(&tokens);
+
+    strncpy(current_file, save_current_file, 256);
+}
+
 // This is so fun <3
 int main(int argc, char *argv[]) {
     if (argc < 2){
@@ -66,52 +91,33 @@ int main(int argc, char *argv[]) {
 
     char* file_path_with_extenstion = argv[1];
 
-    printf("\033[94mCompiling %s\033[0m\n", file_path_with_extenstion);
-    char* buff = load_file(file_path_with_extenstion);
-
-
-    char file_path[strlen(file_path_with_extenstion) - 2];
-    #ifndef _WIN64
-    strcpy(file_path, file_path_with_extenstion);
-    #else
-    strcpy_s(
-        file_path,
-        strlen(file_path_with_extenstion) - 2, 
-        file_path_with_extenstion
-    );
-    #endif
-    file_path[strlen(file_path_with_extenstion) - 2] = '\0';
-
-    // ------------ Tokenize --------------
-    TokenList tokens = { NULL, 0 };
-    tokenize(&tokens, buff);
-
-
-    // printf("\033[94mParsed Tokens:\033[0m\n");
-    // printTokens(tokens);
-
-    // ------------ Parse --------------
-    Program program = parse(tokens);
-    printf("\033[94mParsed Program:\033[0m\n");
-    print_program(&program, 0);
+    Parser parser = {(Program){NULL, new_scope(NULL)}, NULL};
+    compile_file_to_scope(&parser, file_path_with_extenstion);
 
     // ----------- Generate IR ------------
     printf("\033[94mGenerating IR:\033[0m\n");
-    IRList ir = ast_to_tac(&program);
-    // print_ir_list(ir);
+    IRList ir = ast_to_tac(&parser.program);
+    print_ir_list(ir);
 
     // ---------- Convert to ASM ----------
     printf("\033[94mGenerating ASM:\033[0m\n");
-    /*
+
     FILE* f = fopen("tmp.s", "w");
-    generate_asm(f, &program);
+    generate_asm(f, &parser.program);
     fclose(f);
-    */
 
     // ---------- Convert to ASM ----------
     printf("\033[94mAssembling:\033[0m\n");
 
     char* asm_file_command = (char*) malloc(sizeof(char) * 256);
+
+    char file_path[strlen(file_path_with_extenstion) - 2];
+    strncpy(
+        file_path,
+        file_path_with_extenstion,
+        strlen(file_path_with_extenstion) - 2
+    );
+    file_path[strlen(file_path_with_extenstion) - 2] = '\0';
 
     sprintf(asm_file_command, "gcc tmp.s -o %s.exe", file_path);
     system(asm_file_command);
@@ -120,15 +126,13 @@ int main(int argc, char *argv[]) {
     free(asm_file_command);
 
     // ---------- Cleanup ----------
-    free_program(program);
-    free(buff);
+    free_program(parser.program);
 
     for (int i = 0; arrlen(ir) > i; i++) {
         IR tac = ir[i];
         arrfree(tac);
     }
     arrfree(ir);
-    free_token_list_and_data(&tokens);
 
     // test_idk();
 
