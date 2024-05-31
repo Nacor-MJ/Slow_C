@@ -406,6 +406,7 @@ typedef enum {
 // result = arg1
 // param arg1
 // result = arg1() ; arg2 = number of params
+// return arg1
 typedef struct TAC {
     Address arg1; // param; assign, num of params for call
     Address arg2;

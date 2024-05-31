@@ -145,12 +145,20 @@ Address expr_to_ir(IR* destination, Expr* e) {
 
 void throwaway_to_ir(IR* destination, Expr e) {
     IR dest = *destination;
-    *destination = dest;    
+    expr_to_ir(&dest, &e);
+    *destination = dest;
 }
 
 void return_to_ir(IR* destination, Expr e) {
     IR dest = *destination;
-    *destination = dest;    
+    TAC return_ir = ( TAC ) {
+        expr_to_ir(&dest, &e),
+        EMPTY_ADDRESS,
+        EMPTY_ADDRESS,
+        TAC_RETURN
+    };
+    arrput(dest, return_ir);
+    *destination = dest;
 }
 
 void block_to_ir(IR* destination, StmtList block) {
