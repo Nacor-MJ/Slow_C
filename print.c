@@ -324,16 +324,24 @@ const char* type_to_string(Type* type) {
             return "Unknown";
     }
 }
+IR* current_ir = NULL;
 void print_address(Address* a) {
     if (a == NULL) {
-        printf("NULL");
+        printf("NULL\n");
         return;
     }
     switch (a->kind) {
+        case ADDR_NONE:
+            printf("NONE");
+            break;
         case ADDR_CONSTANT:
             print_const_val(&a->constant);
             break;
         case ADDR_VARIABLE:
+            if (a->variable == NULL) {
+                printf("NULL");
+                break;
+            }
             printf("\033[34m%s\033[0m", a->variable->key);
             break;
         case ADDR_TEMPORARY:
@@ -345,7 +353,14 @@ void print_address(Address* a) {
             }
             break;
         case ADDR_LABEL:
-            print_address(&a->label->result);
+            if (current_ir == NULL) {
+                printf("NULL");
+                break;
+            }
+            print_address(&(*current_ir)[a->label_index].result);
+            break;
+        case ADDR_BASIC_BLOCK:
+            printf("\033[36mB%d\033[0m", a->bb_index);
             break;
         default:
             printf("Unknown");
@@ -448,7 +463,9 @@ void print_tac(TAC* tac) {
             printf("\n");
             break;
         case TAC_RETURN:
-            printf("ret\n");
+            printf("ret ");
+            print_address(&tac->arg1);
+            printf("\n");
             break;
         case TAC_IF_JMP:
             printf("\033[35mjmp if true \033[0m");
@@ -475,14 +492,38 @@ void print_tac(TAC* tac) {
     }
 }
 void print_ir(IR ir) {
+    current_ir = &ir;
     for (int i = 0; i < arrlen(ir); i++) {
+        printf("%03d: ", i);
         TAC tac = ir[i];
         print_tac(&tac);
     }
+    current_ir = NULL;
 }
 void print_ir_list(IRList ir) {
     for (int i = 0; i < arrlen(ir); i++) {
         IR ir_s = ir[i];
         print_ir(ir_s);
+    }
+}
+void print_basic_block(BasicBlock* bb) {
+    printf("\033[96mB%d:\033[0m\n", bb->index);
+
+    printf("Variables: ");
+    for (int j = 0; j < hmlen(bb->variables); j++) {
+        Variable* v = bb->variables[j].key;
+        if (v==NULL) continue;
+        printf("%s, ", v->key);
+    } puts("");
+
+    for (TAC* tac = bb->leader; tac <= bb->end; tac++) {
+        print_tac(tac);
+    }
+
+}
+void print_basic_block_list(FunctionBlocks* list) {
+    for (int i = 0; i < arrlen(*list); i++) {
+        BasicBlock bb = (*list)[i];
+        print_basic_block(&bb);
     }
 }

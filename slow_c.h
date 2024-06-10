@@ -24,6 +24,7 @@ static void inline __attribute__((noreturn)) fuck(int i, const char* a, int b) {
 typedef struct Expr Expr;
 typedef struct Statement Statement;
 typedef struct Type Type;
+typedef struct BasicBlock BasicBlock;
 
 typedef enum TypeKind {
     TY_NONE,
@@ -162,9 +163,35 @@ typedef enum {
 } Binop;
 const char* op_enum_to_char(Binop op);
 
-typedef struct {
+typedef struct Variable Variable;
+typedef struct TAC TAC;
+
+typedef struct Storage Storage;
+typedef struct Storage {
+    Variable* variable;
+    int stack_offset;
+    enum {
+        R12,
+        R13,
+        R14,
+        R15,
+        STACK,
+        NONE
+    } kind;
+    Storage* next;
+} Storage;
+
+typedef struct Liveliness {
+    bool is_live;
+    TAC* next_use;
+} Liveliness;
+
+typedef struct Variable {
     char* key;
     Type* value;
+    // vec of variables that are live at the same time
+    // Variable* buddies;
+    Liveliness liveliness;
 } Variable;
 
 typedef struct Scope Scope;
@@ -284,6 +311,7 @@ typedef struct Statement {
 } Statement;
 
 void free_stmt_list(StmtList);
+void free_stmt_list_not_scope(StmtList list);
 
 typedef struct Parser {
     Program program;
@@ -338,16 +366,8 @@ void free_program(Program);
 void free_token_list_and_data(TokenList* list);
 
 // 
-// assembly.c
-//
-
-void generate_asm(FILE* f, Program* program);
-
-// 
 // ir.c
 //
-
-typedef struct TAC TAC;
 
 // named labels are stored as variable 
 // and compiler generated ones are in temporary
@@ -356,13 +376,16 @@ typedef struct Address {
         ConstVal constant;
         Variable* variable;
         int temporary;
-        TAC* label;
+        int label_index;
+        int bb_index;
     };
     enum {
         ADDR_CONSTANT,
         ADDR_VARIABLE,
         ADDR_TEMPORARY,
-        ADDR_LABEL
+        ADDR_LABEL,
+        ADDR_BASIC_BLOCK,
+        ADDR_NONE
     } kind;
 } Address;
 extern Address EMPTY_ADDRESS;
@@ -397,21 +420,23 @@ typedef enum {
 
 // Represents the Three address instruction
 //
-// result = arg1 op arg2
-// if arg1 op arg2 goto result
-// if arg1 goto result
-// ifFalse arg1 goto result
-// result: 
-// jmp result
-// result = arg1
-// param arg1
-// result = arg1() ; arg2 = number of params
-// return arg1
+// result = arg1 op arg2;
+// if arg1 op arg2 goto result;
+// if arg1 goto result;
+// ifFalse arg1 goto result;
+// result:;
+// call arg1;
+// jmp result;
+// result = arg1;
+// param arg1;
+// result = arg1() ; arg2 = number of params;
+// return arg1;
 typedef struct TAC {
     Address arg1; // param; assign, num of params for call
     Address arg2;
     Address result; // target of jumps; label
     TAC_OP op;
+    Liveliness liveliness[3];
 } TAC;
 
 typedef TAC* IR;
@@ -421,6 +446,26 @@ IRList ast_to_tac(Program* program);
 
 void statement_to_ir(IR* destination, Statement* st);
 Address expr_to_ir(IR* destination, Expr* e);
+
+//
+// optimization.c
+//
+
+typedef struct {
+    Variable* key;
+} HashSetVariable;
+
+typedef struct BasicBlock {
+    TAC* leader;
+    TAC* end;
+    int index;
+    HashSetVariable* variables;
+} BasicBlock;
+
+typedef BasicBlock* FunctionBlocks;
+typedef FunctionBlocks* FunctionBlocksList;
+
+BasicBlock basic_block_init(int index);
 
 //
 // print.c
@@ -441,4 +486,23 @@ void print_tac(TAC* tac);
 void tokenize(TokenList* tk, char* src, Parser* parser);
 void compile_file_to_scope(Parser* parser, char const* path);
 void parse(Parser* parser, TokenList src);
+
+void blockification(FunctionBlocks* result, IR program);
+void print_basic_block_list(FunctionBlocks* bb);
+void print_basic_block(BasicBlock* bb);
+
+//
+// x64.c
+//
+
+Variable* hash_set_union(Variable* dest, Variable* b);
+
+typedef struct MachineInstr {
+    TAC_OP op;
+    Storage target;
+    Storage arg;
+} MachineInstr;
+typedef MachineInstr* MachineInstrList;
+void generate_x64(MachineInstrList* result, FunctionBlocksList* program_p);
+
 #endif

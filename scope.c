@@ -23,7 +23,17 @@ Variable* add_variable(Scope* p, Token var, Type* type) {
     return result;
 }
 Variable* get_variable(Scope* p, char* ident) {
-    return shgetp_null(p->variables, ident);
+    Scope* scope = p;
+    Variable* var = NULL;
+    while (scope != NULL) {
+        var = shgetp_null(scope->variables, ident);
+        if (var != NULL) {
+            return var;
+        }
+        scope = scope->parent;
+    }
+    printf("Variable not found: %s\n", ident);
+    my_exit(-1);
 }
 Type* get_var_type(Scope* p, Token var) {
     int idx = shgeti(p->variables, var.data.ident);

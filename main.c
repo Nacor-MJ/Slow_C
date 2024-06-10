@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "slow_c.h"
 
 char current_file[256];
@@ -18,7 +15,7 @@ void test_idk() {
     if (s_return == g_return) {
         printf("\033[92mPassed\033[0m\n");
     } else {
-        printf("\033[91mFailed\033[0m\n");
+       printf("\033[91mFailed\033[0m\n");
     }
 }
 
@@ -74,7 +71,7 @@ void compile_file_to_scope(Parser* parser, char const* path) {
 
     parse(parser, tokens);
     printf("\033[94mParsed Program:\033[0m\n");
-    print_program(&parser->program, 0);
+    // print_program(&parser->program, 0);
 
     free(buff);
     free_token_list_and_data(&tokens);
@@ -97,15 +94,36 @@ int main(int argc, char *argv[]) {
     // ----------- Generate IR ------------
     printf("\033[94mGenerating IR:\033[0m\n");
     IRList ir = ast_to_tac(&parser.program);
-    print_ir_list(ir);
+    // print_ir_list(ir);
+
+
+    printf("\033[94mBlockification:\033[0m\n");
+    FunctionBlocks* bb_l = NULL;
+    for (int i = 0; arrlen(ir) > i; i++) {
+        FunctionBlocks b = NULL;
+        blockification(&b, ir[i]);
+        arrpush(bb_l, b);
+    }
+
+    free_stmt_list_not_scope(parser.program);
 
     // ---------- Convert to ASM ----------
     printf("\033[94mGenerating ASM:\033[0m\n");
 
-    FILE* f = fopen("tmp.s", "w");
-    generate_asm(f, &parser.program);
-    fclose(f);
+    MachineInstrList machine_code = NULL;
+    generate_x64(&machine_code, &bb_l);
 
+    arrfree(bb_l);
+
+    for (int i = 0; arrlen(ir) > i; i++) {
+        IR tac = ir[i];
+        arrfree(tac);
+    }
+    arrfree(ir);
+    deinit_scope(parser.program.scope);
+
+
+    NOT_IMPLEMENTED;
     // ---------- Convert to ASM ----------
     printf("\033[94mAssembling:\033[0m\n");
 
@@ -126,13 +144,6 @@ int main(int argc, char *argv[]) {
     free(asm_file_command);
 
     // ---------- Cleanup ----------
-    free_program(parser.program);
-
-    for (int i = 0; arrlen(ir) > i; i++) {
-        IR tac = ir[i];
-        arrfree(tac);
-    }
-    arrfree(ir);
 
     // test_idk();
 

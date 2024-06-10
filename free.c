@@ -35,7 +35,6 @@ void free_stmt_list_not_scope(StmtList list) {
 }
 void free_stmt_list(StmtList list) {
     free_stmt_list_not_scope(list);
-    // FIXME: honestly what in the jesus is this shit
 
     deinit_scope(list.scope);
 }

@@ -302,7 +302,6 @@ void parse_program(Parser* parser, TokenList* tk) {
     Program result = parser->program;
 
     Statement next;
-    printf("next token type: %d\n", next_token(tk)->type);
     while (next_token(tk)->type != TK_EOF) {
         if ( next_token(tk)->type != TK_COMMENT &&
             next_token(tk)->type != TK_SEMICOLON &&

@@ -543,7 +543,7 @@ extern void *stbds_shmode_func(size_t elemsize, int mode);
   ((__typeof__(typevar)[1]){value}) // literal array decays to pointer to value
 #else
 #define STBDS_ADDRESSOF(typevar, value)                                        \
-  ((typeof(typevar)[1]){value}) // literal array decays to pointer to value
+  ((__typeof__(typevar)[1]){value}) // literal array decays to pointer to value
 #endif
 #else
 #define STBDS_ADDRESSOF(typevar, value) &(value)

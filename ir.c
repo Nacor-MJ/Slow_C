@@ -11,7 +11,7 @@ Address new_temporary() {
 };
 
 const ConstVal ZERO = {.integer = 0, CONST_INT};
-Address EMPTY_ADDRESS = {.constant = ZERO, EXPR_CONSTANT};
+Address EMPTY_ADDRESS = {.constant = ZERO, ADDR_NONE};
 
 // TAC of a label with Var
 TAC label_to_tac(Variable* var) {
@@ -21,12 +21,13 @@ TAC label_to_tac(Variable* var) {
     return t;
 }
 
-TAC* get_last_tac(IR* destination) {
-    return (TAC*) (
-        *destination + arrlen(*destination) - 1
+int get_last_tac(IR* destination) {
+    return (
+        arrlen(*destination) - 1
     );
 }
 
+// Appends the new loop label and returns its adress
 Address new_loop_label(IR* destination) {
     IR dest = *destination;
     Address label = {
@@ -42,7 +43,7 @@ Address new_loop_label(IR* destination) {
     arrput(dest, tac);
 
     Address a = {
-        .label = get_last_tac(&dest),
+        .label_index = get_last_tac(&dest),
         ADDR_LABEL
     };
 
@@ -180,11 +181,11 @@ void while_loop_to_ir(IR* destination, Loop* l) {
         condition,
         EMPTY_ADDRESS,
         EMPTY_ADDRESS,
-        TAC_IF_FALSE_JMP
+        TAC_IF_FALSE_JMP,
+        {{0}}
     };
     arrput(dest, tmp);
-    TAC* jump_over = get_last_tac(&dest);
-
+    int jump_over_index = get_last_tac(&dest);
 
     statement_to_ir(&dest, l->body);
 
@@ -192,11 +193,12 @@ void while_loop_to_ir(IR* destination, Loop* l) {
         EMPTY_ADDRESS,
         EMPTY_ADDRESS,
         loop_back,
-        TAC_JMP
+        TAC_JMP,
+        {{0}}
     };
     arrput(dest, goto_jmp);
 
-    jump_over->result = new_loop_label(&dest);
+    dest[jump_over_index].result = new_loop_label(&dest);
 
     *destination = dest;
 }
@@ -226,11 +228,12 @@ void conditional_jump_to_ir(IR* destination, ConditionalJump* c) {
         condition,
         EMPTY_ADDRESS,
         EMPTY_ADDRESS,
-        TAC_IF_FALSE_JMP
+        TAC_IF_FALSE_JMP,
+        {{0}}
     };
     arrput(dest, tmp);
 
-    TAC* jump_over = get_last_tac(&dest);
+    int jump_over_index = get_last_tac(&dest);
 
     if (c->else_block != NULL) {
         NOT_IMPLEMENTED;
@@ -239,7 +242,7 @@ void conditional_jump_to_ir(IR* destination, ConditionalJump* c) {
     statement_to_ir(&dest, c->then_block);
 
     Address jump_over_label = new_loop_label(&dest);
-    jump_over->result = jump_over_label;
+    dest[jump_over_index].result = jump_over_label;
 
     *destination = dest;
 }
