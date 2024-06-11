@@ -6,7 +6,7 @@ OBJS=$(SRCS:.c=.o)
 # Stage 1
 
 Slow_C: $(OBJS)
-	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS) -g -lm
+	-gcc $(CFLAGS) -o $@ $^ $(LDFLAGS) -g -lm
 	rm *.o
 	clear
 

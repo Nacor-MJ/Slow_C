@@ -428,7 +428,11 @@ void print_tac_op(TAC_OP tac_op) {
     }
     printf("%s", op);
 }
-
+void print_tac_liveness(Liveness l[3]) {
+    for (int i = 0; i < 3; i++) {
+        printf("%d ", l[i].is_live);
+    }
+}
 void print_tac(TAC* tac) {
     // if this thing is a label for the function call
     if (tac->op != TAC_LABEL || tac->result.kind != ADDR_VARIABLE) {
@@ -509,11 +513,17 @@ void print_ir_list(IRList ir) {
 void print_basic_block(BasicBlock* bb) {
     printf("\033[96mB%d:\033[0m\n", bb->index);
 
-    printf("Variables: ");
+    printf("Variables: \n");
     for (int j = 0; j < hmlen(bb->variables); j++) {
         Variable* v = bb->variables[j].key;
         if (v==NULL) continue;
-        printf("%s, ", v->key);
+        printf("%s budies: %lld :", v->key, hmlen(v->buddies));
+        for (int i = 0; hmlen(v->buddies) > i; i++) {
+            Variable* v2 = v->buddies[i].key;
+            if (v2==NULL) continue;
+            printf("%s, ", v2->key);
+        }
+        puts("");
     } puts("");
 
     for (TAC* tac = bb->leader; tac <= bb->end; tac++) {

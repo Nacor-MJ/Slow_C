@@ -20,6 +20,9 @@ Variable* add_variable(Scope* p, Token var, Type* type) {
 
     Variable* result = shgetp_null(p->variables, var.data.ident);  
 
+    result->buddies = NULL;
+    memset(&result->liveness, 0, sizeof(result->liveness));
+
     return result;
 }
 Variable* get_variable(Scope* p, char* ident) {

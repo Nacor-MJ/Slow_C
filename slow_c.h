@@ -184,14 +184,20 @@ typedef struct Storage {
 typedef struct Liveliness {
     bool is_live;
     TAC* next_use;
-} Liveliness;
+} Liveness;
+
+typedef struct {
+    Variable* key;
+} HashSetVariable;
+
+HashSetVariable* hash_set_union(HashSetVariable* dest, HashSetVariable* b);
 
 typedef struct Variable {
     char* key;
     Type* value;
     // vec of variables that are live at the same time
-    // Variable* buddies;
-    Liveliness liveliness;
+    HashSetVariable* buddies;
+    Liveness liveness;
 } Variable;
 
 typedef struct Scope Scope;
@@ -421,7 +427,6 @@ typedef enum {
 // Represents the Three address instruction
 //
 // result = arg1 op arg2;
-// if arg1 op arg2 goto result;
 // if arg1 goto result;
 // ifFalse arg1 goto result;
 // result:;
@@ -436,7 +441,7 @@ typedef struct TAC {
     Address arg2;
     Address result; // target of jumps; label
     TAC_OP op;
-    Liveliness liveliness[3];
+    Liveness liveness[3];
 } TAC;
 
 typedef TAC* IR;
@@ -451,18 +456,18 @@ Address expr_to_ir(IR* destination, Expr* e);
 // optimization.c
 //
 
-typedef struct {
-    Variable* key;
-} HashSetVariable;
-
 typedef struct BasicBlock {
     TAC* leader;
     TAC* end;
     int index;
     HashSetVariable* variables;
+    BasicBlock* vec_predecesors;
 } BasicBlock;
 
+// list of basic blocks == Function
 typedef BasicBlock* FunctionBlocks;
+
+// list of function blocks == Program
 typedef FunctionBlocks* FunctionBlocksList;
 
 BasicBlock basic_block_init(int index);
@@ -482,6 +487,7 @@ void print_address(Address*);
 void print_ir_list(IRList);
 void print_ir(IR ir);
 void print_tac(TAC* tac);
+void print_tac_liveness(Liveness liveness[3]);
 
 void tokenize(TokenList* tk, char* src, Parser* parser);
 void compile_file_to_scope(Parser* parser, char const* path);
@@ -494,8 +500,6 @@ void print_basic_block(BasicBlock* bb);
 //
 // x64.c
 //
-
-Variable* hash_set_union(Variable* dest, Variable* b);
 
 typedef struct MachineInstr {
     TAC_OP op;

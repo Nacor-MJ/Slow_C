@@ -1,14 +1,5 @@
 #include "slow_c.h"
 
-Variable* hash_set_union(Variable* dest, Variable* b) {
-    for (int i = 0; hmlen(b) > i; i++) {
-        Variable a = b[i];
-        hmputs(dest, a);
-    }
-    hmfree(b);
-    return dest;
-}
-
 typedef struct {
     int key; // tac_index
     int value;
@@ -46,7 +37,7 @@ void blockification(FunctionBlocks* result, IR program) {
     IndexLabelHash* hash = NULL;
 
     int index_counter = 0;
-    BasicBlock block = (BasicBlock) {NULL, NULL, index_counter++};
+    BasicBlock block = (BasicBlock) {NULL, NULL, index_counter++, NULL, NULL};
 
     block.leader = program + 0;
 
@@ -82,16 +73,19 @@ void blockification(FunctionBlocks* result, IR program) {
                 block.leader = program + i;
                 index_counter++;
             }
+            /*
             // remove jump labels but not function labels
             if (block.leader->op != TAC_LABEL ||
                 block.leader->result.kind != ADDR_VARIABLE) {
                 block.leader += 1;
             }
+            */
 
             label_bb_switch(&hash, &program, i, &block);
         } else if (tac->op == TAC_JMP || 
             tac->op == TAC_IF_JMP ||
-            tac->op == TAC_IF_FALSE_JMP ) {
+            tac->op == TAC_IF_FALSE_JMP ||
+            tac-> op == TAC_RETURN) {
             block.end = program + i;
             if (block.leader < block.end ) {
                 arrpush(*result, block);
@@ -115,5 +109,18 @@ void blockification(FunctionBlocks* result, IR program) {
             tac->op == TAC_IF_FALSE_JMP) {
             jmp_label_to_bb(hash, tac);
         };
+    }
+    // assign predecesors to the basic blocks
+    for (int i = 0; i < arrlen(*result); i++) {
+        BasicBlock* bb = (*result) + i;
+        if (i > 0) arrpush(bb->vec_predecesors, *(bb - 1));
+
+        if (bb->leader->op == TAC_LABEL) {
+            arrpush(
+                bb->vec_predecesors, 
+                (*result)[hmgeti(hash, bb->leader->result.label_index)]
+            );
+            bb->leader += 1;
+        }
     }
 };

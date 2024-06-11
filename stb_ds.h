@@ -566,7 +566,7 @@ extern void *stbds_shmode_func(size_t elemsize, int mode);
   (stbds_arrmaybegrow(a, 1), (a)[stbds_header(a)->length++] = (v))
 #define stbds_arrpush stbds_arrput // synonym
 #define stbds_arrpop(a)                                                        \
-  (stbds_header(a)->length--, (a)[stbds_header(a)->length])
+  (stbds_header(a)->length--, (void) (a)[stbds_header(a)->length])
 #define stbds_arraddn(a, n)                                                    \
   ((void)(stbds_arraddnindex(                                                  \
       a, n))) // deprecated, use one of the following instead:
