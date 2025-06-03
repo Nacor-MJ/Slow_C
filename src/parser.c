@@ -1,12 +1,14 @@
 #ifndef PARSER_C
 #define PARSER_C
 
-#include "slow_c.h"
+#include "../include/slow_c.h"
 
-char* absolute_start;
+char *absolute_start;
 
-void check_types(Type* t1, Type* t2, Token* tk) {
-    if (t1 != t2) {
+void check_types(Type *t1, Type *t2, Token *tk)
+{
+    if (t1 != t2)
+    {
         printf("\033[31mType mismatch %s!=%s\033[0m", type_to_string(t1), type_to_string(t2));
 
         TokenData tv;
@@ -14,74 +16,78 @@ void check_types(Type* t1, Type* t2, Token* tk) {
         Token dbg_tk = {
             TK_IDENT,
             tv,
-            tk->start_of_token
-        };
+            tk->start_of_token};
 
         print_error_tok(&dbg_tk, absolute_start);
     }
 }
 
 // TODO: check if this screws up the list thingie, idk how the modifying of lengths works
-void append_expr(ExprList* list, Expr nd) {
+void append_expr(ExprList *list, Expr nd)
+{
     arrput(*list, nd);
 }
-void append_statement(StmtList* list, Statement nd) {
+void append_statement(StmtList *list, Statement nd)
+{
     arrput(list->data, nd);
 }
 
-void parse_arg_list(Scope* current_scope, TokenList* tk, StmtList* list) {
-    while (next_token(tk)->type != TK_RPAREN) {
-        Token* type_tk = eat_token_checked(tk, TK_TYPE_KEYWORD);
-        Token* name = eat_token_checked(tk, TK_IDENT);
-        Variable* var = add_variable(current_scope, *name, type_tk->data.type);
+void parse_arg_list(Scope *current_scope, TokenList *tk, StmtList *list)
+{
+    while (next_token(tk)->type != TK_RPAREN)
+    {
+        Token *type_tk = eat_token_checked(tk, TK_TYPE_KEYWORD);
+        Token *name = eat_token_checked(tk, TK_IDENT);
+        Variable *var = add_variable(current_scope, *name, type_tk->data.type);
 
         VariableAssignment va = {
             type_tk->data.type,
             zero_expr(name),
-            var
-        };
-        Statement nd = (Statement) {
+            var};
+        Statement nd = (Statement){
             STMT_VARIABLE_ASSIGNMENT,
-            .variable_assignment = va
-        };
+            .variable_assignment = va};
 
         append_statement(list, nd);
 
-        if (next_token(tk)->type != TK_RPAREN) eat_token_checked(tk, TK_COMMA);
+        if (next_token(tk)->type != TK_RPAREN)
+            eat_token_checked(tk, TK_COMMA);
     }
 }
 
-
-Statement parse_var_declaration(Scope* p, TokenList* tk) {
-    Token* type_tk = eat_token_checked(tk, TK_TYPE_KEYWORD);
-    Type* type = type_tk->data.type;
-    Token* name = eat_token(tk);
+Statement parse_var_declaration(Scope *p, TokenList *tk)
+{
+    Token *type_tk = eat_token_checked(tk, TK_TYPE_KEYWORD);
+    Type *type = type_tk->data.type;
+    Token *name = eat_token(tk);
     VariableAssignment va = {
         type,
         zero_expr(name),
-        NULL
-    };
-    if (next_token(tk)->type == TK_ASSIGN) {
+        NULL};
+    if (next_token(tk)->type == TK_ASSIGN)
+    {
         eat_token_checked(tk, TK_ASSIGN);
         Expr expr = parse_expr(p, tk);
         check_types(type, expr.type, next_token(tk));
         eat_token_checked(tk, TK_SEMICOLON);
         va.val = expr;
-    } else {
+    }
+    else
+    {
         eat_token_checked(tk, TK_SEMICOLON);
     }
     va.ident = add_variable(p, *name, type_tk->data.type);
 
-    return (Statement) {
+    return (Statement){
         STMT_VARIABLE_ASSIGNMENT,
         .variable_assignment = va,
-        name
-    };
+        name};
 }
 
-Statement parse_var_redeclaration(Scope* p, TokenList* tk) {
-    Token* name = eat_token(tk);
-    Type* type = get_var_type(p, *name);
+Statement parse_var_redeclaration(Scope *p, TokenList *tk)
+{
+    Token *name = eat_token(tk);
+    Type *type = get_var_type(p, *name);
 
     eat_token_checked(tk, TK_ASSIGN);
     Expr expr = parse_expr(p, tk);
@@ -90,154 +96,181 @@ Statement parse_var_redeclaration(Scope* p, TokenList* tk) {
     VariableAssignment va = {
         type,
         expr,
-        get_variable(p, name->data.ident)
-    };
+        get_variable(p, name->data.ident)};
 
-    return (Statement) {
+    return (Statement){
         STMT_VARIABLE_ASSIGNMENT,
         .variable_assignment = va,
-        name
-    };
+        name};
 }
 
 // Parses if statement in these forms:
 // if (Expr) Statement
 // if (Expr) Statement else Statement
-Statement parse_if_statement(Scope * parent, TokenList* tk) {
-    Scope* subscope = new_scope(parent);
+Statement parse_if_statement(Scope *parent, TokenList *tk)
+{
+    Scope *subscope = new_scope(parent);
     eat_token_checked(tk, TK_IF);
     eat_token_checked(tk, TK_LPAREN);
 
-    Expr* cond = (Expr*) malloc(sizeof(Expr));
-    if (cond == NULL) my_exit(69);
+    Expr *cond = (Expr *)malloc(sizeof(Expr));
+    if (cond == NULL)
+        my_exit(69);
     *cond = parse_expr(parent, tk);
 
     eat_token_checked(tk, TK_RPAREN);
 
-    Statement* if_body = (Statement*) malloc(sizeof(Statement)); 
-    if (if_body == NULL) my_exit(69);
+    Statement *if_body = (Statement *)malloc(sizeof(Statement));
+    if (if_body == NULL)
+        my_exit(69);
     *if_body = parse_statement(subscope, tk);
 
-    Statement* else_body = NULL;
+    Statement *else_body = NULL;
 
-    if (next_token(tk)->type == TK_ELSE) {
+    if (next_token(tk)->type == TK_ELSE)
+    {
         eat_token_checked(tk, TK_ELSE);
-        else_body = (Statement*) malloc(sizeof(Statement));
-        if (else_body == NULL) my_exit(69);
+        else_body = (Statement *)malloc(sizeof(Statement));
+        if (else_body == NULL)
+            my_exit(69);
         *else_body = parse_statement(subscope, tk);
     }
 
-    if (next_token(tk)->type == TK_SEMICOLON) eat_token(tk);
+    if (next_token(tk)->type == TK_SEMICOLON)
+        eat_token(tk);
 
-    ConditionalJump  l = { cond, if_body, else_body };
-    return (Statement) { STMT_CONDITIONAL_JUMP, .conditional_jump = l};
+    ConditionalJump l = {cond, if_body, else_body};
+    return (Statement){STMT_CONDITIONAL_JUMP, .conditional_jump = l};
 }
 
-
-Statement parse_while_statement(Scope * parent, TokenList* tk) {
-    Scope* subscope = new_scope(parent);
+Statement parse_while_statement(Scope *parent, TokenList *tk)
+{
+    Scope *subscope = new_scope(parent);
 
     eat_token_checked(tk, TK_WHILE);
     eat_token_checked(tk, TK_LPAREN);
 
-    Expr* cond = (Expr*) malloc(sizeof(Expr));
-    if (cond == NULL) my_exit(69);
+    Expr *cond = (Expr *)malloc(sizeof(Expr));
+    if (cond == NULL)
+        my_exit(69);
     *cond = parse_expr(parent, tk);
 
     eat_token_checked(tk, TK_RPAREN);
 
-    Statement* body = (Statement*) malloc(sizeof(Statement)); 
-    if (body == NULL) my_exit(69);
+    Statement *body = (Statement *)malloc(sizeof(Statement));
+    if (body == NULL)
+        my_exit(69);
     *body = parse_statement(subscope, tk);
 
-    if (next_token(tk)->type == TK_SEMICOLON) eat_token(tk);
+    if (next_token(tk)->type == TK_SEMICOLON)
+        eat_token(tk);
 
-    Loop l = { cond, NULL, NULL, body, WHILE };
-    return (Statement) { STMT_LOOP, .loop = l};
+    Loop l = {cond, NULL, NULL, body, WHILE};
+    return (Statement){STMT_LOOP, .loop = l};
 }
 
-Statement parse_statement(Scope* p, TokenList* tk) {
+Statement parse_statement(Scope *p, TokenList *tk)
+{
     while (
-        next_token(tk)->type == TK_COMMENT
-    ) {
+        next_token(tk)->type == TK_COMMENT)
+    {
         eat_token(tk);
     }
 
-    Token* next = next_token(tk);
+    Token *next = next_token(tk);
     // Variable definiton
-    if (next->type == TK_TYPE_KEYWORD) {
-        Token* over_next = next_token_with_offset(tk, 2);
+    if (next->type == TK_TYPE_KEYWORD)
+    {
+        Token *over_next = next_token_with_offset(tk, 2);
         // Variable
-        if (over_next->type == TK_ASSIGN || over_next->type == TK_SEMICOLON) {
+        if (over_next->type == TK_ASSIGN || over_next->type == TK_SEMICOLON)
+        {
             return parse_var_declaration(p, tk);
-        // Function
-        } else if (over_next->type == TK_LPAREN) {
+            // Function
+        }
+        else if (over_next->type == TK_LPAREN)
+        {
             return parse_function_definition(p, tk);
-        } else {
+        }
+        else
+        {
             printf("Expected definiton got ");
             print_error_tok(next, absolute_start);
             my_exit(-1);
         }
-    // Variable redeclaration
-    } else if (next->type == TK_IDENT) {
-        if (next_token_with_offset(tk, 1)->type == TK_ASSIGN) {
+        // Variable redeclaration
+    }
+    else if (next->type == TK_IDENT)
+    {
+        if (next_token_with_offset(tk, 1)->type == TK_ASSIGN)
+        {
             return parse_var_redeclaration(p, tk);
             // function_call
-        } else {
+        }
+        else
+        {
             Expr expr = parse_expr(p, tk);
             Statement rst = {
                 STMT_THROW_AWAY,
                 .throw_away = expr,
-                expr.start
-            };
+                expr.start};
             eat_token_checked(tk, TK_SEMICOLON);
             return rst;
         }
-    } else if (next->type == TK_RETURN) {
-        Token* start = eat_token(tk);
+    }
+    else if (next->type == TK_RETURN)
+    {
+        Token *start = eat_token(tk);
 
         Statement rst = {
             STMT_RETURN,
             .return_ = parse_expr(p, tk),
-            start
-        };
+            start};
         eat_token_checked(tk, TK_SEMICOLON);
         return rst;
-    } else if (next->type == TK_IF) {
+    }
+    else if (next->type == TK_IF)
+    {
         return parse_if_statement(p, tk);
-    } else if (next->type == TK_WHILE) {
+    }
+    else if (next->type == TK_WHILE)
+    {
         return parse_while_statement(p, tk);
-    } else if (next->type == TK_LCURLY) {
+    }
+    else if (next->type == TK_LCURLY)
+    {
         StmtList block = parse_block(p, tk);
-        return (Statement) {
+        return (Statement){
             STMT_BLOCK,
             .block = block,
-            next
-        };
-    } else if (next->type == TK_SEMICOLON) {
+            next};
+    }
+    else if (next->type == TK_SEMICOLON)
+    {
         eat_token_checked(tk, TK_SEMICOLON);
-        return (Statement) {
+        return (Statement){
             STMT_THROW_AWAY,
             .throw_away = zero_expr(next),
-            next
-        };
-    } else {
+            next};
+    }
+    else
+    {
         printf("Expected statement got ");
         print_error_tok(next, absolute_start);
         my_exit(-1);
     }
 }
 
-Statement parse_function_definition(Scope* parent, TokenList* tk) {
+Statement parse_function_definition(Scope *parent, TokenList *tk)
+{
     StmtList args = {
         NULL,
-        new_scope(parent)
-    };
+        new_scope(parent)};
 
-    Token* type_tk = eat_token_checked(tk, TK_TYPE_KEYWORD);
-    Token* name = eat_token(tk);
+    Token *type_tk = eat_token_checked(tk, TK_TYPE_KEYWORD);
+    Token *name = eat_token(tk);
 
-    Variable* var = add_variable(parent, *name, type_tk->data.type);
+    Variable *var = add_variable(parent, *name, type_tk->data.type);
 
     eat_token_checked(tk, TK_LPAREN);
 
@@ -245,30 +278,31 @@ Statement parse_function_definition(Scope* parent, TokenList* tk) {
 
     eat_token_checked(tk, TK_RPAREN);
 
-    StmtList body = { 0 };
+    StmtList body = {0};
 
-    if (next_token(tk)->type == TK_LCURLY) {
+    if (next_token(tk)->type == TK_LCURLY)
+    {
         body = parse_block(args.scope, tk);
     }
-    if (next_token(tk)->type == TK_SEMICOLON) {
+    if (next_token(tk)->type == TK_SEMICOLON)
+    {
         eat_token_checked(tk, TK_SEMICOLON);
     }
 
     FunctionDefinition fd = {
         var,
         args,
-        body
-    };
+        body};
 
     Statement fn = {
         STMT_FUNCTION_DEFINITION,
         .function_definition = fd,
-        type_tk
-    };
+        type_tk};
     return fn;
 }
 
-void push_stmt(StmtList* list, Statement st) {
+void push_stmt(StmtList *list, Statement st)
+{
     arrput(list->data, st);
 }
 
@@ -278,16 +312,17 @@ void push_stmt(StmtList* list, Statement st) {
 // }
 //
 // the caller is responsible for creating the new scope
-StmtList parse_block(Scope* current_scope, TokenList* tk) {
+StmtList parse_block(Scope *current_scope, TokenList *tk)
+{
     eat_token_checked(tk, TK_LCURLY);
 
     StmtList result = {
         NULL,
-        current_scope
-    };
+        current_scope};
 
     Statement next;
-    while (next_token(tk)->type != TK_RCURLY) {
+    while (next_token(tk)->type != TK_RCURLY)
+    {
         next = parse_statement(current_scope, tk);
 
         arrput(result.data, next);
@@ -298,14 +333,17 @@ StmtList parse_block(Scope* current_scope, TokenList* tk) {
 }
 
 // Parses the global scope
-void parse_program(Parser* parser, TokenList* tk) {
+void parse_program(Parser *parser, TokenList *tk)
+{
     Program result = parser->program;
 
     Statement next;
-    while (next_token(tk)->type != TK_EOF) {
-        if ( next_token(tk)->type != TK_COMMENT &&
+    while (next_token(tk)->type != TK_EOF)
+    {
+        if (next_token(tk)->type != TK_COMMENT &&
             next_token(tk)->type != TK_SEMICOLON &&
-            next_token(tk)->type != TK_TYPE_KEYWORD) {
+            next_token(tk)->type != TK_TYPE_KEYWORD)
+        {
             printf("Only assignments allowed in the global scope\n");
             print_error_tok(next_token(tk), absolute_start);
             my_exit(-1);
@@ -319,8 +357,9 @@ void parse_program(Parser* parser, TokenList* tk) {
 }
 
 // Entry point of parser.c
-void parse(Parser* parser, TokenList src){
-    char* save_start = absolute_start;
+void parse(Parser *parser, TokenList src)
+{
+    char *save_start = absolute_start;
 
     src.pars_ptr = 0;
     absolute_start = next_token(&src)->start_of_token;

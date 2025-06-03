@@ -1,37 +1,27 @@
-CFLAGS=-std=c11 -g3 -fno-common -Wall -Wno-switch -Werror -fms-extensions
+# CC and flags
+CC = gcc
+CFLAGS = -std=c11 -g3 -fno-common -Wall -Wno-switch -Werror -fms-extensions -Iinclude
 
-SRCS=$(filter-out idk.c, $(wildcard *.c))
-OBJS=$(SRCS:.c=.o)
+# Source and object files
+SRC = $(wildcard src/*.c)
+LIB = $(wildcard lib/*.c)
+OBJ = $(SRC:.c=.o) $(LIB:.c=.o)
+TARGET = slow_c
 
-# Stage 1
+all: $(TARGET)
 
-Slow_C: $(OBJS)
-	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS) -g -lm
-	rm *.o
-	clear
+$(TARGET): $(OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
-$(OBJS): slow_c.h
+src/%.o: src/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-gdb: Slow_C
-	gdb -ex run --args ./Slow_C.exe idk.c
-
-test_idk: Slow_C
-	./Slow_C.exe idk.c
-	-./idk.exe
-
-git:
-	./git.ps1
-
-valgrind: Slow_C
-	valgrind --leak-check=full \
-         --show-leak-kinds=all \
-         --track-origins=yes \
-         --verbose \
-         ./Slow_C idk.c
-
-# Misc.
+lib/%.o: lib/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	-rm main.exe.stackdump
-	-rm -rf slow_c tmp* 
-	-rm *.exe
+	del /Q src\*.o lib\*.o $(TARGET).exe 2>nul || true
+	del /Q main.exe.stackdump 2>nul || true
+	del /Q slow_c tmp* *.exe 2>nul || true
+
+.PHONY: all clean

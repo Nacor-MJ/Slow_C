@@ -9,16 +9,16 @@
 
 #include "stb_ds.h"
 
-
 // this is the best function I have here
-static void inline __attribute__((noreturn)) fuck(int i, const char* a, int b) {
-    printf("\033[31mError %d in %s:%d\033[0m\n", i, a, b); \
-    *(int*)0 = 0;\
+static void inline __attribute__((noreturn)) fuck(int i, const char *a, int b)
+{
+    printf("\033[31mError %d in %s:%d\033[0m\n", i, a, b);
+    *(int *)0 = 0;
     exit(0);
 };
 #define my_exit(i) fuck(i, __FILE__, __LINE__);
-#define NOT_IMPLEMENTED \
-    printf("\033[31mIn function %s not implemented\033[0m\n", __FUNCTION__);\
+#define NOT_IMPLEMENTED                                                      \
+    printf("\033[31mIn function %s not implemented\033[0m\n", __FUNCTION__); \
     fuck(69, __FILE__, __LINE__)
 
 typedef struct Expr Expr;
@@ -26,7 +26,8 @@ typedef struct Statement Statement;
 typedef struct Type Type;
 typedef struct BasicBlock BasicBlock;
 
-typedef enum TypeKind {
+typedef enum TypeKind
+{
     TY_NONE,
 
     TY_INT,
@@ -45,29 +46,34 @@ typedef enum TypeKind {
 
     TY_PTR,
 } TypeKind;
-typedef Type* Types;
+typedef Type *Types;
 
-typedef struct Member {
-    char* name;
-    Type* type;
+typedef struct Member
+{
+    char *name;
+    Type *type;
     int offset;
 } Member;
-typedef Member* Members;
-typedef struct FuncData {
+typedef Member *Members;
+typedef struct FuncData
+{
     Types return_type;
     Types param_type;
 } FuncData;
-typedef struct PointerData {
-    Type* type;
+typedef struct PointerData
+{
+    Type *type;
     int array_len;
 } PointerData;
-typedef union TypeData {
-    Members members; // structs
+typedef union TypeData
+{
+    Members members;  // structs
     PointerData base; // pointers and arrays
     FuncData func;
 } TypeData;
 
-typedef struct Type {
+typedef struct Type
+{
     TypeKind kind;
     int size;
     int allign;
@@ -75,7 +81,7 @@ typedef struct Type {
     TypeData data;
 } Type;
 
-extern Type* ty_none;
+extern Type *ty_none;
 extern Type *ty_void;
 extern Type *ty_bool;
 extern Type *ty_char;
@@ -86,7 +92,8 @@ extern Type *ty_float;
 // tokens.c
 //
 
-typedef enum {
+typedef enum
+{
     TK_EOF = 0,
     TK_PLUS,
     TK_MINUS,
@@ -99,14 +106,14 @@ typedef enum {
     TK_RPAREN,
     TK_LCURLY, // {
     TK_RCURLY, // }
-    TK_EQ, // ==
-    TK_NE, // !=
-    TK_MT, // >
-    TK_LT, // <
-    TK_ME, // >=
-    TK_LE, // <=
+    TK_EQ,     // ==
+    TK_NE,     // !=
+    TK_MT,     // >
+    TK_LT,     // <
+    TK_ME,     // >=
+    TK_LE,     // <=
     TK_SEMICOLON,
-    TK_ASSIGN,  // =
+    TK_ASSIGN, // =
     TK_COMMA,
     TK_TYPE_KEYWORD,
     TK_RETURN,
@@ -117,37 +124,41 @@ typedef enum {
     TK_FOR,
     TK_INCLUDE
 } TokenType;
-typedef union {
+typedef union
+{
     // If you add anything here implement compare_tokens for it
     int integer;
     float floating;
-    char* ident;
-    Type* type;
+    char *ident;
+    Type *type;
 } TokenData;
-typedef struct {
+typedef struct
+{
     TokenType type;
     TokenData data;
-    char* start_of_token;
+    char *start_of_token;
 } Token;
 
-typedef struct {
-    Token* data;
+typedef struct
+{
+    Token *data;
     int pars_ptr;
 } TokenList;
 
-void print_error_tok(Token*, char*);
-Token* eat_token_checked(TokenList* tk, TokenType check);
-Token* eat_token(TokenList* tk);
-Token* next_token(TokenList* tk);
-Token* next_token_with_offset(TokenList* tk, int offset);
-void print_tokens(TokenList* t);
+void print_error_tok(Token *, char *);
+Token *eat_token_checked(TokenList *tk, TokenType check);
+Token *eat_token(TokenList *tk);
+Token *next_token(TokenList *tk);
+Token *next_token_with_offset(TokenList *tk, int offset);
+void print_tokens(TokenList *t);
 bool compare_tokens(Token a, Token b);
 
 //
 // parser.c
 //
 
-typedef enum {
+typedef enum
+{
     OP_INVALID,
     OP_PLUS,
     OP_MINUS,
@@ -161,16 +172,18 @@ typedef enum {
     OP_LE,
     OP_MOV // Not really a binop but meh
 } Binop;
-const char* op_enum_to_char(Binop op);
+const char *op_enum_to_char(Binop op);
 
 typedef struct Variable Variable;
 typedef struct TAC TAC;
 
 typedef struct Storage Storage;
-typedef struct Storage {
-    Variable* variable;
+typedef struct Storage
+{
+    Variable *variable;
     int stack_offset;
-    enum {
+    enum
+    {
         R12,
         R13,
         R14,
@@ -178,58 +191,67 @@ typedef struct Storage {
         STACK,
         NONE
     } kind;
-    Storage* next;
+    Storage *next;
 } Storage;
 
-typedef struct Liveliness {
+typedef struct Liveliness
+{
     bool is_live;
-    TAC* next_use;
+    TAC *next_use;
 } Liveliness;
 
-typedef struct Variable {
-    char* key;
-    Type* value;
+typedef struct Variable
+{
+    char *key;
+    Type *value;
     // vec of variables that are live at the same time
     // Variable* buddies;
     Liveliness liveliness;
 } Variable;
 
 typedef struct Scope Scope;
-typedef struct Scope {
-    Variable* variables;
-    Scope* parent;
+typedef struct Scope
+{
+    Variable *variables;
+    Scope *parent;
     int depth;
 } Scope;
 
-typedef Expr* ExprList;
-typedef struct StmtList {
-    Statement* data;
-    Scope* scope;
+typedef Expr *ExprList;
+typedef struct StmtList
+{
+    Statement *data;
+    Scope *scope;
 } StmtList;
 
-StmtList new_stmt_list(Scope* );
+StmtList new_stmt_list(Scope *);
 
 typedef StmtList Program;
 
-typedef struct {
-    Expr* l;
+typedef struct
+{
+    Expr *l;
     Binop op;
-    Expr* r;
+    Expr *r;
 } BinExpr;
 
-typedef struct {
-    Type* type;
-    char* name;
+typedef struct
+{
+    Type *type;
+    char *name;
     ExprList args;
 } FunctionCall;
-typedef struct {
-    union {
+typedef struct
+{
+    union
+    {
         int integer;
         float floating;
         char character;
-        char* string;
+        char *string;
     };
-    enum {
+    enum
+    {
         CONST_INT,
         CONST_FLOAT,
         CONST_CHAR,
@@ -237,13 +259,15 @@ typedef struct {
     } kind;
 } ConstVal;
 
-typedef union {
+typedef union
+{
     ConstVal constant;
-    Variable* variable_ident;
+    Variable *variable_ident;
     FunctionCall function_call;
-    BinExpr* bin_expr;
+    BinExpr *bin_expr;
 } ExprVal;
-typedef enum {
+typedef enum
+{
     EMPTY_EXPR,
     EXPR_CONSTANT,
     VARIABLE_IDENT,
@@ -251,41 +275,48 @@ typedef enum {
     BIN_EXPR
 } ExprVar;
 // TODO: get rid of ExprVal with anonymous union
-typedef struct Expr {
+typedef struct Expr
+{
     ExprVar var;
     ExprVal val;
-    Token* start;
-    Type* type;
+    Token *start;
+    Type *type;
 } Expr;
 
-typedef struct {
-    Variable* type;
+typedef struct
+{
+    Variable *type;
     StmtList args;
     StmtList body;
 } FunctionDefinition;
-typedef struct {
-    Type* type;
+typedef struct
+{
+    Type *type;
     Expr val;
-    Variable* ident;
+    Variable *ident;
 } VariableAssignment;
-typedef struct Conditional_jump {
-    Expr* condition;
-    Statement* then_block;
-    Statement* else_block;
+typedef struct Conditional_jump
+{
+    Expr *condition;
+    Statement *then_block;
+    Statement *else_block;
 } ConditionalJump;
-typedef struct Loop {
-    Expr* condition;
-    Statement* init;
-    Statement* increment;
-    Statement* body;
-    enum {
+typedef struct Loop
+{
+    Expr *condition;
+    Statement *init;
+    Statement *increment;
+    Statement *body;
+    enum
+    {
         DO_WHILE,
         WHILE,
         FOR
     } kind;
 } Loop;
 
-typedef enum StmtVar {
+typedef enum StmtVar
+{
     STMT_VARIABLE_ASSIGNMENT,
     STMT_FUNCTION_DEFINITION,
     STMT_CONDITIONAL_JUMP,
@@ -295,9 +326,11 @@ typedef enum StmtVar {
     STMT_RETURN,
     STMT_THROW_AWAY
 } StmtVar;
-typedef struct Statement {
+typedef struct Statement
+{
     StmtVar var;
-    union StmtVal {
+    union StmtVal
+    {
         VariableAssignment variable_assignment;
         FunctionDefinition function_definition;
         ConditionalJump conditional_jump;
@@ -307,79 +340,81 @@ typedef struct Statement {
         Expr return_;
         Expr throw_away;
     };
-    Token* start;
+    Token *start;
 } Statement;
 
 void free_stmt_list(StmtList);
 void free_stmt_list_not_scope(StmtList list);
 
-typedef struct Parser {
+typedef struct Parser
+{
     Program program;
-    char* absolute_start;
+    char *absolute_start;
 } Parser;
 
-void parse_program(Parser*, TokenList*);
-StmtList parse_block(Scope* p, TokenList* tk);
-Statement parse_statement(Scope* p, TokenList* tk);
+void parse_program(Parser *, TokenList *);
+StmtList parse_block(Scope *p, TokenList *tk);
+Statement parse_statement(Scope *p, TokenList *tk);
 
-Statement parse_function_definition(Scope* p, TokenList* tk);
+Statement parse_function_definition(Scope *p, TokenList *tk);
 
-void parse_arg_list(Scope*p, TokenList* tk, StmtList* list);
-void append_statement(StmtList* list, Statement nd);
-void append_expr(ExprList* list, Expr nd);
+void parse_arg_list(Scope *p, TokenList *tk, StmtList *list);
+void append_statement(StmtList *list, Statement nd);
+void append_expr(ExprList *list, Expr nd);
 
-void check_types(Type* t1, Type* t2, Token* tk);
+void check_types(Type *t1, Type *t2, Token *tk);
 
 //
 // scope.c
 //
 
-Variable* add_variable(Scope* p, Token var, Type* type);
-Type* get_var_type(Scope* p, Token var);
-Variable* get_variable(Scope* p, char* ident);
+Variable *add_variable(Scope *p, Token var, Type *type);
+Type *get_var_type(Scope *p, Token var);
+Variable *get_variable(Scope *p, char *ident);
 
-Scope* new_scope(Scope* parent);
-void deinit_scope(Scope* s);
+Scope *new_scope(Scope *parent);
+void deinit_scope(Scope *s);
 
 //
 // expr.c
 //
 
-Expr zero_expr(Token* );
-Expr parse_function_call(Scope* p, TokenList* tk);
-Expr parse_expr(Scope*, TokenList*);
-Type* get_expr_type(Expr*);
-
+Expr zero_expr(Token *);
+Expr parse_function_call(Scope *p, TokenList *tk);
+Expr parse_expr(Scope *, TokenList *);
+Type *get_expr_type(Expr *);
 
 //
 // post_processing.c
 //
 
-void post_processing(Program* root);
+void post_processing(Program *root);
 
-
-// 
+//
 // free.c
 //
 
 void free_program(Program);
-void free_token_list_and_data(TokenList* list);
+void free_token_list_and_data(TokenList *list);
 
-// 
+//
 // ir.c
 //
 
-// named labels are stored as variable 
+// named labels are stored as variable
 // and compiler generated ones are in temporary
-typedef struct Address {
-    union {
+typedef struct Address
+{
+    union
+    {
         ConstVal constant;
-        Variable* variable;
+        Variable *variable;
         int temporary;
         int label_index;
         int bb_index;
     };
-    enum {
+    enum
+    {
         ADDR_CONSTANT,
         ADDR_VARIABLE,
         ADDR_TEMPORARY,
@@ -391,8 +426,9 @@ typedef struct Address {
 extern Address EMPTY_ADDRESS;
 
 // Three address code type
-//  binops, assign, label, jumps, call, params 
-typedef enum {
+//  binops, assign, label, jumps, call, params
+typedef enum
+{
     TAC_ADD,
     TAC_SUB,
     TAC_MUL,
@@ -413,7 +449,7 @@ typedef enum {
     TAC_NE,
     TAC_EQ,
 
-    TAC_CALL, 
+    TAC_CALL,
     TAC_PARAM,
     TAC_RETURN,
 } TAC_OP;
@@ -431,7 +467,8 @@ typedef enum {
 // param arg1;
 // result = arg1() ; arg2 = number of params;
 // return arg1;
-typedef struct TAC {
+typedef struct TAC
+{
     Address arg1; // param; assign, num of params for call
     Address arg2;
     Address result; // target of jumps; label
@@ -439,31 +476,33 @@ typedef struct TAC {
     Liveliness liveliness[3];
 } TAC;
 
-typedef TAC* IR;
-typedef IR* IRList;
+typedef TAC *IR;
+typedef IR *IRList;
 
-IRList ast_to_tac(Program* program);
+IRList ast_to_tac(Program *program);
 
-void statement_to_ir(IR* destination, Statement* st);
-Address expr_to_ir(IR* destination, Expr* e);
+void statement_to_ir(IR *destination, Statement *st);
+Address expr_to_ir(IR *destination, Expr *e);
 
 //
 // optimization.c
 //
 
-typedef struct {
-    Variable* key;
+typedef struct
+{
+    Variable *key;
 } HashSetVariable;
 
-typedef struct BasicBlock {
-    TAC* leader;
-    TAC* end;
+typedef struct BasicBlock
+{
+    TAC *leader;
+    TAC *end;
     int index;
-    HashSetVariable* variables;
+    HashSetVariable *variables;
 } BasicBlock;
 
-typedef BasicBlock* FunctionBlocks;
-typedef FunctionBlocks* FunctionBlocksList;
+typedef BasicBlock *FunctionBlocks;
+typedef FunctionBlocks *FunctionBlocksList;
 
 BasicBlock basic_block_init(int index);
 
@@ -471,38 +510,39 @@ BasicBlock basic_block_init(int index);
 // print.c
 //
 
-const char* type_to_string(Type*);
-void print_vars(Scope* p);
-void print_token(Token*);
-void print_type_keyword(Type*);
-void print_program(Program*, int);
-void print_statement(Statement*, int);
-void print_expr(Expr*, int);
-void print_address(Address*);
+const char *type_to_string(Type *);
+void print_vars(Scope *p);
+void print_token(Token *);
+void print_type_keyword(Type *);
+void print_program(Program *, int);
+void print_statement(Statement *, int);
+void print_expr(Expr *, int);
+void print_address(Address *);
 void print_ir_list(IRList);
 void print_ir(IR ir);
-void print_tac(TAC* tac);
+void print_tac(TAC *tac);
 
-void tokenize(TokenList* tk, char* src, Parser* parser);
-void compile_file_to_scope(Parser* parser, char const* path);
-void parse(Parser* parser, TokenList src);
+void tokenize(TokenList *tk, char *src, Parser *parser);
+void compile_file_to_scope(Parser *parser, char const *path);
+void parse(Parser *parser, TokenList src);
 
-void blockification(FunctionBlocks* result, IR program);
-void print_basic_block_list(FunctionBlocks* bb);
-void print_basic_block(BasicBlock* bb);
+void blockification(FunctionBlocks *result, IR program);
+void print_basic_block_list(FunctionBlocks *bb);
+void print_basic_block(BasicBlock *bb);
 
 //
 // x64.c
 //
 
-Variable* hash_set_union(Variable* dest, Variable* b);
+Variable *hash_set_union(Variable *dest, Variable *b);
 
-typedef struct MachineInstr {
+typedef struct MachineInstr
+{
     TAC_OP op;
     Storage target;
     Storage arg;
 } MachineInstr;
-typedef MachineInstr* MachineInstrList;
-void generate_x64(MachineInstrList* result, FunctionBlocksList* program_p);
+typedef MachineInstr *MachineInstrList;
+void generate_x64(MachineInstrList *result, FunctionBlocksList *program_p);
 
 #endif
